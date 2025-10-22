@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Sensor readings from the device
+model SensorReading {
+  id            String   @id @default(uuid())
+  deviceId      String
+  timestamp     DateTime @default(now())
+  soilMoisture  Float?
+  temperature   Float?
+  humidity      Float?
+  light         Float?
+  batteryLevel  Float?
+
+  @@index([deviceId])
+  @@index([timestamp])
+}
+
+// Hourly aggregated sensor data for long-term storage
+model SensorAggregation {
+  id             String   @id @default(uuid())
+  deviceId       String
+  hour           DateTime // Truncated to hour
+  soilMin        Float?
+  soilMax        Float?
+  soilAvg        Float?
+  tempMin        Float?
+  tempMax        Float?
+  tempAvg        Float?
+  humidityMin    Float?
+  humidityMax    Float?
+  humidityAvg    Float?
+  lightMin       Float?
+  lightMax       Float?
+  lightAvg       Float?
+  readingCount   Int
+
+  @@index([deviceId])
+  @@index([hour])
+  @@unique([deviceId, hour])
+}
+
+// Plant images captured by the device
+model Image {
+  id          String      @id @default(uuid())
+  deviceId    String
+  timestamp   DateTime    @default(now())
+  imageUrl    String
+  storageKey  String      // Storage path/key for the image
+  detections  Detection[]
+  
+  @@index([deviceId])
+  @@index([timestamp])
+}
+
+// Plant detections from YOLO API
+model Detection {
+  id          String    @id @default(uuid())
+  imageId     String
+  image       Image     @relation(fields: [imageId], references: [id])
+  timestamp   DateTime  @default(now())
+  label       String    // Plant type detected
+  confidence  Float     // Detection confidence 0-1
+  x           Float?    // Bounding box X (if available)
+  y           Float?    // Bounding box Y
+  width       Float?    // Bounding box width
+  height      Float?    // Bounding box height
+  
+  @@index([imageId])
+  @@index([label])
+}
+
+// Plant types and their ideal conditions
+model PlantType {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  label       String  @unique // Map to YOLO detection label
+  soilMin     Float
+  soilMax     Float
+  tempMin     Float
+  tempMax     Float
+  humidityMin Float
+  humidityMax Float
+  lightMin    Float
+  lightMax    Float
+  description String?
+}
+
+// Watering events (auto or manual)
+model WateringEvent {
+  id          String    @id @default(uuid())
+  deviceId    String
+  timestamp   DateTime  @default(now())
+  duration    Int       // Duration in seconds
+  source      String    // 'auto' or 'manual'
+  initiator   String?   // User ID or system component that initiated
+  soilBefore  Float?    // Soil moisture before watering
+  soilAfter   Float?    // Soil moisture after watering (if recorded)
+  
+  @@index([deviceId])
+  @@index([timestamp])
+}
+
+// Device status changes
+model DeviceStatus {
+  id          String    @id @default(uuid())
+  deviceId    String
+  timestamp   DateTime  @default(now())
+  status      String    // 'online' or 'offline'
+  
+  @@index([deviceId])
+  @@index([timestamp])
+}
+
+// Device command queue
+model DeviceCommand {
+  id          String    @id @default(uuid())
+  deviceId    String
+  command     String    // e.g., 'water', 'update_thresholds'
+  params      String    // JSON string of command parameters
+  status      String    // 'queued', 'executing', 'completed', 'failed'
+  result      String?   // JSON string of command result
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+  
+  @@index([deviceId])
+  @@index([status])
+}

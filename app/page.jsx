@@ -15,12 +15,6 @@ export default function Home() {
           >
             View Dashboard
           </a>
-          <a
-            href="#about"
-            className="px-8 py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-lg transition duration-200"
-          >
-            Learn More
-          </a>
         </div>
       </div>
     </main>

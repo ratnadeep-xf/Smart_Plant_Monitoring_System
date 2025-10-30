@@ -1,7 +1,5 @@
 # API Routes Implementation Summary
 
-All API routes have been successfully created with ES6 modules (import/export). Below is a complete reference.
-
 ## Authentication
 All device endpoints require: `Authorization: Bearer <DEVICE_TOKEN_SECRET>`
 
@@ -289,5 +287,3 @@ curl -X POST http://localhost:3000/api/control/water \
 - ✅ POST /api/commands/:id
 - ✅ GET /api/commands/:id
 - ✅ scripts/seedData.js
-
-All files use **ES6 imports/exports** as requested!

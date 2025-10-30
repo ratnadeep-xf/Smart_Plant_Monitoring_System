@@ -1,3 +1,4 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,128 +8,130 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Sensor readings from the device
-model SensorReading {
-  id            String   @id @default(uuid())
-  deviceId      String
-  timestamp     DateTime @default(now())
-  soilMoisture  Float?
-  temperature   Float?
-  humidity      Float?
-  light         Float?
-  batteryLevel  Float?
+// =====================================================
+// Smart Adaptive Plant Care - Prisma Schema
+// =====================================================
 
-  @@index([deviceId])
-  @@index([timestamp])
-}
-
-// Hourly aggregated sensor data for long-term storage
-model SensorAggregation {
-  id             String   @id @default(uuid())
-  deviceId       String
-  hour           DateTime // Truncated to hour
-  soilMin        Float?
-  soilMax        Float?
-  soilAvg        Float?
-  tempMin        Float?
-  tempMax        Float?
-  tempAvg        Float?
-  humidityMin    Float?
-  humidityMax    Float?
-  humidityAvg    Float?
-  lightMin       Float?
-  lightMax       Float?
-  lightAvg       Float?
-  readingCount   Int
-
-  @@index([deviceId])
-  @@index([hour])
-  @@unique([deviceId, hour])
-}
-
-// Plant images captured by the device
-model Image {
-  id          String      @id @default(uuid())
-  deviceId    String
-  timestamp   DateTime    @default(now())
-  imageUrl    String
-  storageKey  String      // Storage path/key for the image
-  detections  Detection[]
-  
-  @@index([deviceId])
-  @@index([timestamp])
-}
-
-// Plant detections from YOLO API
-model Detection {
-  id          String    @id @default(uuid())
-  imageId     String
-  image       Image     @relation(fields: [imageId], references: [id])
-  timestamp   DateTime  @default(now())
-  label       String    // Plant type detected
-  confidence  Float     // Detection confidence 0-1
-  x           Float?    // Bounding box X (if available)
-  y           Float?    // Bounding box Y
-  width       Float?    // Bounding box width
-  height      Float?    // Bounding box height
-  
-  @@index([imageId])
-  @@index([label])
-}
-
-// Plant types and their ideal conditions
 model PlantType {
-  id          String  @id @default(uuid())
-  name        String  @unique
-  label       String  @unique // Map to YOLO detection label
-  soilMin     Float
-  soilMax     Float
-  tempMin     Float
-  tempMax     Float
-  humidityMin Float
-  humidityMax Float
-  lightMin    Float
-  lightMax    Float
-  description String?
+  id         String    @id @default(uuid())
+  name       String    @unique
+  thresholds Json      // { soil_min, soil_max, temp_min, temp_max, humidity_min, humidity_max, light_min, light_max }
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  detections      Detection[]
+  labelMappings   LabelMapping[]
 }
 
-// Watering events (auto or manual)
-model WateringEvent {
-  id          String    @id @default(uuid())
-  deviceId    String
-  timestamp   DateTime  @default(now())
-  duration    Int       // Duration in seconds
-  source      String    // 'auto' or 'manual'
-  initiator   String?   // User ID or system component that initiated
-  soilBefore  Float?    // Soil moisture before watering
-  soilAfter   Float?    // Soil moisture after watering (if recorded)
-  
-  @@index([deviceId])
+model PlantData {
+  id                       String   @id @default(uuid())
+  commonName               String   @map("common_name")
+  wateringAmountMl         Float?   @map("watering_amount_ml")
+  wateringFrequencyDays    Int?     @map("watering_frequency_days")
+  idealSunlightExposure    String?  @map("ideal_sunlight_exposure")
+  idealRoomTemperatureC    Float?   @map("ideal_room_temperature_c")
+  idealHumidityPercent     Float?   @map("ideal_humidity_percent")
+  fertilizerType           String?  @map("fertilizer_type")
+  idealFertilizerAmountMl  Float?   @map("ideal_fertilizer_amount_ml")
+  pestPresence             Boolean? @map("pest_presence")
+  pestSeverity             String?  @map("pest_severity")
+  idealSoilMoisturePercent Float?   @map("ideal_soil_moisture_percent")
+  idealSoilType            String?  @map("ideal_soil_type")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  detections      Detection[]
+  labelMappings   LabelMapping[]
+}
+
+model Image {
+  id         String      @id @default(uuid())
+  // Cloudinary fields
+  publicId   String?     @map("public_id")    // Cloudinary public_id
+  secureUrl  String?     @map("secure_url")   // HTTPS URL returned by Cloudinary (canonical)
+  imageUrl   String?     // legacy / optional field (kept for compatibility)
+  folder     String?     // Cloudinary folder/path (e.g., "plant-demo/device-abc/2025/10")
+  width      Int?
+  height     Int?
+  format     String?
+  bytes      Int?
+  timestamp  DateTime    @default(now())
+  metadata   Json?       // EXIF / custom tags returned by Cloudinary
+
+  detections      Detection[]
+  inferenceCache  InferenceCache?
+  readings        Reading[]
+
+  createdAt  DateTime @default(now())
+
   @@index([timestamp])
+  @@index([publicId])
 }
 
-// Device status changes
-model DeviceStatus {
-  id          String    @id @default(uuid())
-  deviceId    String
-  timestamp   DateTime  @default(now())
-  status      String    // 'online' or 'offline'
-  
-  @@index([deviceId])
+model Detection {
+  id           String     @id @default(uuid())
+  image        Image      @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  imageId      String
+  plantType    PlantType? @relation(fields: [plantTypeId], references: [id])
+  plantTypeId  String?
+  plantData    PlantData? @relation(fields: [plantDataId], references: [id])
+  plantDataId  String?
+
+  label        String
+  confidence   Float
+  bbox         Json?
+  dominant     Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+
+  @@index([label])
+  @@index([createdAt])
+}
+
+model Reading {
+  id           String   @id @default(uuid())
+  timestamp    DateTime @default(now())
+  deviceId     String?                 // optional for single-device setup
+  soilPct      Float?
+  temperatureC Float?
+  humidityPct  Float?
+  lux          Float?
+  imageId      String?
+  image        Image?   @relation(fields: [imageId], references: [id])
+  rawPayload   Json?
+
   @@index([timestamp])
+  @@index([deviceId])
 }
 
-// Device command queue
-model DeviceCommand {
-  id          String    @id @default(uuid())
-  deviceId    String
-  command     String    // e.g., 'water', 'update_thresholds'
-  params      String    // JSON string of command parameters
-  status      String    // 'queued', 'executing', 'completed', 'failed'
-  result      String?   // JSON string of command result
-  createdAt   DateTime  @default(now())
-  completedAt DateTime?
-  
-  @@index([deviceId])
-  @@index([status])
+/// Cache the raw YOLO/provider response for a given Image.
+/// This prevents repeated calls to the YOLO provider for the same image.
+model InferenceCache {
+  id           String   @id @default(uuid())
+  image        Image    @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  imageId      String   @unique
+  provider     String   // e.g., "roboflow", "ultralytics"
+  responseJson Json     // raw provider response (store as JSON)
+  createdAt    DateTime @default(now())
+
+  @@index([provider, createdAt])
+}
+
+/// Map YOLO label strings to PlantType and PlantData rows.
+/// Use `minConfidence` to require a minimum confidence before accepting the mapping.
+model LabelMapping {
+  id            String     @id @default(uuid())
+  label         String     @unique
+  normalized    String?    // optional normalized label for fuzzy matching
+  plantType     PlantType? @relation(fields: [plantTypeId], references: [id], onDelete: Cascade)
+  plantTypeId   String?
+  plantData     PlantData? @relation(fields: [plantDataId], references: [id], onDelete: Cascade)
+  plantDataId   String?
+  minConfidence Float?     @default(0.5) // threshold to accept mapping
+  notes         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([label])
 }

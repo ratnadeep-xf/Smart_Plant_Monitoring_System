@@ -82,14 +82,14 @@ export default function GaugeCard({ title, value, min, max, unit, color = 'blue'
       </div>
       
       {/* Value display */}
-      <div className="mb-3 flex justify-center items-center">
+      <div className="mb-4 flex justify-center items-center">
         <div className={`text-4xl font-bold transition-all duration-300 ${percentage > 75 || percentage < 25 ? 'animate-pulse' : ''}`}>
           {value}<span className="text-xl ml-1">{unit}</span>
         </div>
       </div>
       
       {/* Gauge visualization */}
-      <div className="relative h-8 bg-gray-700 rounded-full overflow-hidden mb-2 shadow-inner">
+      <div className="relative h-9 bg-gray-700 rounded-full overflow-hidden mb-2 shadow-inner">
         {/* Animated background patterns for gauge */}
         <div className="absolute inset-0 opacity-10">
           <svg className="w-full h-full" viewBox="0 0 100 8" preserveAspectRatio="none">
@@ -104,7 +104,7 @@ export default function GaugeCard({ title, value, min, max, unit, color = 'blue'
         
         {/* Progress bar with gradient */}
         <div 
-          className={`absolute top-0 left-0 h-full bg-gradient-to-r ${theme.gradient} rounded-full transition-all duration-500 shadow-lg ${theme.glow}`}
+          className={`absolute top-0 left-0 h-full bg-linear-to-r ${theme.gradient} rounded-full transition-all duration-500 shadow-lg ${theme.glow}`}
           style={{ width: `${percentage}%` }}
         ></div>
         

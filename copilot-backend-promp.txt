@@ -1,0 +1,190 @@
+INSTRUCTIONS FOR COPILOT — GENERATE THE BACKEND/API
+
+## Overview
+
+You will generate a full Next.js backend (API routes) for the "Smart Adaptive Plant Care" project. The backend must:
+
+* Accept telemetry and images from a Raspberry Pi device.
+* Upload images to Cloudinary and persist Cloudinary metadata to PostgreSQL via Prisma.
+* Call a hosted YOLO inference API (e.g., Roboflow/Ultralytics) using the Cloudinary image URL and parse detections.
+* Cache YOLO responses per image to prevent repeated provider calls.
+* Map YOLO label strings to PlantType (thresholds) and PlantData (descriptive) via a LabelMapping table.
+* Provide endpoints for the frontend to fetch latest reading, history, images, detections, plant details, and to trigger a rate-limited manual water command.
+* Provide a command queue where the Pi polls `GET /api/commands` and acks via `POST /api/commands/:id`.
+* Secure device endpoints by a device token in Authorization header.
+* Include error handling, logging, and basic tests.
+
+Important note: The Prisma schema already exists in `prisma/schema.prisma`. Do not reproduce the schema inside this prompt — instruct Copilot to read `prisma/schema.prisma` for the data model.
+
+## Constraints & style
+
+* Use TypeScript across server code.
+* Use Next.js API routes (pages/api/) for clarity.
+* Organize code into modular files/folders (services/, lib/, middlewares/, pages/api/, prisma/).
+* Add clear comments and TODOs where developer secrets or provider-specific values are required.
+* Keep responses compact when generating files (one file per assistant message is fine).
+
+## Essential packages (suggest these in package.json)
+
+* next, react, react-dom
+* typescript, ts-node, @types/node
+* prisma, @prisma/client
+* cloudinary
+* axios (or node-fetch)
+* formidable (or multer) for multipart parsing
+* zod (or yup) for request validation
+* rate-limiter-flexible (or a small in-memory limiter)
+* pino (or winston) for logging
+* dotenv
+* jest, supertest (for basic tests)
+
+## Environment variables (.env.example)
+
+Include these keys in `.env.example` and reference them in README. Copilot should not hardcode secrets.
+
+* DATABASE_URL
+* CLOUDINARY_CLOUD_NAME
+* CLOUDINARY_API_KEY
+* CLOUDINARY_API_SECRET
+* YOLO_PROVIDER_URL
+* YOLO_API_KEY
+* DEVICE_TOKEN_SECRET
+* PORT (optional)
+* RATE_LIMIT_CONFIG (optional)
+* PUSHER/ABLY keys (optional)
+
+## Folder structure to scaffold
+
+Create these files and directories (Copilot should scaffold code inside them):
+
+```
+/project-root
+├─ prisma/                  # already has schema.prisma — read it
+├─ lib/
+│  └─ prisma.ts             # PrismaClient singleton
+├─ services/
+│  ├─ cloudinaryService.ts
+│  ├─ yoloService.ts
+│  ├─ deviceService.ts
+│  └─ labelMappingService.ts
+├─ middlewares/
+│  ├─ authDevice.ts
+│  ├─ errorHandler.ts
+│  └─ rateLimiter.ts
+├─ app/
+│  └─ api/
+│     ├─ telemetry.ts
+│     ├─ image.ts
+│     ├─ images/
+│     │  └─ presign.ts    (optional)
+│     ├─ latest.ts
+│     ├─ history.ts
+│     ├─ plantData/
+│     │  └─ [id].ts
+│     ├─ plantTypes/
+│     │  └─ index.ts
+│     ├─ control/
+│     │  └─ water.ts
+│     ├─ commands.ts
+│     └─ commands/
+│        └─ [id].ts       (ack endpoint)
+├─ scripts/
+│  └─ seed.ts
+├─ utils/
+│  └─ validators.ts
+├─ tests/
+│  └─ api.test.ts
+├─ .env.example
+├─ README.md
+└─ package.json
+```
+
+## Service responsibilities (short)
+
+* `lib/prisma.ts` — export PrismaClient singleton and helper for serverless.
+* `services/cloudinaryService.ts` — uploadFromBuffer(buffer, opts) => { publicId, secureUrl, width, height, format, bytes }; delete(publicId); buildUrl(publicId, transformations).
+* `services/yoloService.ts` — inferByUrl(url) => [{ label, confidence, bbox }]; handles retries, timeouts, and normalization.
+* `services/deviceService.ts` — insert command queue rows; functions for Pi polling & ack.
+* `services/labelMappingService.ts` — lookup mapping for provider label (case-insensitive/normalized), check minConfidence, return plantTypeId & plantDataId.
+* `middlewares/authDevice.ts` — validate `Authorization: Bearer <device_token>` header for device endpoints.
+* `middlewares/rateLimiter.ts` — enforce server-side limits on `/api/control/water` (max 10s per activation, cooldown 15 min, max 2 activations/hour).
+* `middlewares/errorHandler.ts` — standardize JSON error responses.
+
+## API endpoints & expected behavior
+
+1. POST `/api/telemetry`
+
+   * Validate payload (zod). Insert Reading. Optionally link `imageId` if sent. Emit realtime event. Return stored Reading.
+
+2. POST `/api/image`
+
+   * Accept multipart/form-data: `device_id`, `timestamp`, `image_file`.
+   * Auth: device token required.
+   * Flow (server-side upload):
+     a) Parse multipart and get file buffer.
+     b) Upload to Cloudinary via `cloudinaryService.uploadFromBuffer`.
+     c) Insert `Image` row with Cloudinary metadata (publicId, secureUrl, width, height, format, bytes, folder, metadata).
+     d) Check `InferenceCache` by `imageId` or `publicId`; if cached, use cached response to insert Detection rows.
+     e) If not cached, call `yoloService.inferByUrl(secureUrl)` -> insert `InferenceCache` row -> parse detections and insert Detection rows.
+     f) Determine dominant detection (highest confidence) and call `labelMappingService` to map to PlantType / PlantData. If mapping passes minConfidence, set detection.plantTypeId and detection.plantDataId.
+     g) Respond with JSON including image metadata, detections array, and matched plant info (plantTypeId, plantDataId, thresholds).
+
+3. GET `/api/latest`
+
+   * Returns latest Reading, latest Image (secureUrl), latest Detection (dominant) and optionally mapped PlantType & PlantData.
+
+4. GET `/api/history?sensor=...&from=...&to=...&agg=raw|hourly`
+
+   * Return raw or aggregated readings.
+
+5. GET `/api/plantData/:id` and GET `/api/plantTypes`
+
+   * Return PlantData and PlantType rows respectively.
+
+6. POST `/api/control/water`
+
+   * Input: `{ device_id, duration_seconds? }`.
+   * Use authDevice for the Pi or rateLimiter for web triggers. If allowed, insert a queued command in DB and return `{ success, commandId, nextAllowedAt }`.
+
+7. GET `/api/commands?device_id=...`
+
+   * Pi polls, receives queued commands.
+
+8. POST `/api/commands/:id` (ack)
+
+   * Pi posts statuses: `{ status: 'started'|'completed'|'failed', timestamp }`.
+
+## YOLO mapping & caching behavior
+
+* Store raw provider JSON in `InferenceCache` (imageId unique).
+* Create Detection rows per object and mark the dominant detection.
+* Query `LabelMapping` for matches; accept mapping only if `confidence >= minConfidence`.
+* If matched, set `detection.plantTypeId` and `detection.plantDataId`.
+* Cache prevents repeated YOLO calls for the same image.
+
+## Implementation expectations
+
+* Use transactions when creating Image -> InferenceCache -> Detection rows.
+* Set YOLO provider timeout (~10s) and retry/backoff (3 attempts).
+* On repeated YOLO failure, store an `InferenceCache` with `responseJson = { error: 'timeout' }` and return "no detection" gracefully.
+* Validate inputs with zod; return 400 on invalid requests.
+* Use pino/winston for logging; log errors + debug info.
+* Add `scripts/seed.ts` to insert example PlantType, PlantData, and LabelMapping rows (Copilot can read schema and create seeds accordingly).
+* README must include migration (`npx prisma migrate dev --name init`), seed, run instructions, and example cURL commands.
+
+## Testing
+
+* Provide Jest + Supertest tests that validate telemetry and image endpoints (mock Cloudinary and YOLO responses).
+
+## Deliverables
+
+* Full TypeScript backend code (pages/api) plus services, middlewares, utils, prisma scripts, README, .env.example, package.json and tests.
+* Keep generated code modular and well-commented.
+
+## Notes for Copilot
+
+* Read the existing Prisma schema in `prisma/schema.prisma` before generating DB-related code.
+* If you must choose defaults, prefer server-side Cloudinary upload, DEVICE_TOKEN_SECRET for device auth, and in-memory rate limiter with a TODO to move to Redis for production.
+* Keep generated files small and focused (one file per assistant response) to make review easy.
+
+END

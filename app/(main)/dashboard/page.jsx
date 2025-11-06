@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { toast, Toaster } from 'sonner';
 import DashboardHeader from '@/components/DashboardHeader';
 import GaugeCard from '@/components/GaugeCard';
 import ImageCard from '@/components/ImageCard';
 import ControlPanel from '@/components/ControlPanel';
-import AlertBanner from '@/components/AlertBanner';
 import SparklineChart from '@/components/SparklineChart';
 import '@/styles/animations.css';
 
@@ -48,9 +48,6 @@ export default function Dashboard() {
     cooldownTime: null,
     duration: 5
   });
-  
-  // State for alerts
-  const [alerts, setAlerts] = useState([]);
   
   // Fetch latest data from API
   const fetchLatestData = async () => {
@@ -148,20 +145,14 @@ export default function Dashboard() {
           cooldownTime: data.data.nextAllowedAt
         }));
         
-        setAlerts(prev => [
-          ...prev,
-          { id: Date.now(), message: `Watering command sent (${wateringState.duration}s)` }
-        ]);
+        toast.success(`Watering command sent (${wateringState.duration}s)`);
       }
     } catch (error) {
       console.error('Error watering plant:', error);
       setWateringState(prev => ({ ...prev, isLoading: false }));
       
       const message = error.response?.data?.message || 'Error: Could not connect to device';
-      setAlerts(prev => [
-        ...prev,
-        { id: Date.now(), message }
-      ]);
+      toast.error(message);
     }
   };
   
@@ -170,9 +161,6 @@ export default function Dashboard() {
   const handleDurationChange = (newDuration) => {
     setWateringState(prev => ({ ...prev, duration: newDuration }));
   };
-  
-  // Dismiss all alerts
-  const dismissAlerts = () => setAlerts([]);
   
   // Initial data fetch
   useEffect(() => {
@@ -192,8 +180,7 @@ export default function Dashboard() {
   
   return (
     <main className="container mx-auto px-4 py-6">
-      {/* Alerts Banner */}
-      <AlertBanner alerts={alerts} onDismiss={dismissAlerts} />
+      <Toaster position="top-right" richColors />
       
       {/* Dashboard Header */}
       <DashboardHeader 

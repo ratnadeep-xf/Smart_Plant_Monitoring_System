@@ -25,7 +25,7 @@ All device endpoints require: `Authorization: Bearer <DEVICE_TOKEN_SECRET>`
 ---
 
 ### POST /api/image
-**Purpose:** Upload plant image, run YOLO detection, map to plant types  
+**Purpose:** Upload plant image, run Hugging Face AI detection, map to plant types  
 **Content-Type:** multipart/form-data  
 **Fields:**
 - `device_id`: string
@@ -35,7 +35,7 @@ All device endpoints require: `Authorization: Bearer <DEVICE_TOKEN_SECRET>`
 **Flow:**
 1. Upload to Cloudinary
 2. Check InferenceCache
-3. Run YOLO detection (if not cached)
+3. Run Hugging Face AI inference (if not cached)
 4. Map labels to PlantType/PlantData
 5. Store Detection records
 
@@ -147,7 +147,7 @@ All device endpoints require: `Authorization: Bearer <DEVICE_TOKEN_SECRET>`
 **Creates:**
 - PlantType records (Basil, Mint, Rosemary, Tomato)
 - PlantData records (care instructions)
-- LabelMapping records (YOLO labels → PlantType/PlantData)
+- LabelMapping records (AI model labels → PlantType/PlantData)
 
 **Seeds:**
 1. Basil (soilMin: 50, soilMax: 70, tempMin: 18, tempMax: 28)
@@ -162,7 +162,7 @@ All device endpoints require: `Authorization: Bearer <DEVICE_TOKEN_SECRET>`
 ```
 app/api/
 ├── telemetry/route.js          # POST sensor readings
-├── image/route.js              # POST image upload + YOLO
+├── image/route.js              # POST image upload + AI detection
 ├── latest/route.js             # GET latest data
 ├── history/route.js            # GET historical data
 ├── plantData/[id]/route.js     # GET plant care details
@@ -188,8 +188,8 @@ app/api/
 - `export function buildUrl(publicId, transformations)`
 - `export async function getImageDetails(publicId)`
 
-### services/yoloService.js
-- `export async function inferByUrl(imageUrl)` - YOLO detection with retry
+### services/huggingFaceService.js
+- `export async function inferByUrl(imageUrl)` - Hugging Face AI detection with retry
 
 ### services/deviceService.js
 - `export async function queueCommand(command)`
@@ -221,8 +221,9 @@ DEVICE_TOKEN_SECRET="your-secret-token"
 CLOUDINARY_CLOUD_NAME="your-cloud-name"
 CLOUDINARY_API_KEY="your-api-key"
 CLOUDINARY_API_SECRET="your-api-secret"
-YOLO_API_URL="https://detect.roboflow.com/..."
-YOLO_API_KEY="your-yolo-key"
+HF_API_URL="https://api-inference.huggingface.co/models/username/model-name"
+HF_API_TOKEN="hf_your_token_here"
+HF_TIMEOUT_MS="30000"
 ```
 
 ---

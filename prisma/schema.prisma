@@ -111,7 +111,7 @@ model InferenceCache {
   id           String   @id @default(uuid())
   image        Image    @relation(fields: [imageId], references: [id], onDelete: Cascade)
   imageId      String   @unique
-  provider     String   // e.g., "roboflow", "ultralytics"
+  provider     String   // e.g., "HuggingFace"
   responseJson Json     // raw provider response (store as JSON)
   createdAt    DateTime @default(now())
 

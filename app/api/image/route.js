@@ -2,13 +2,12 @@
 import { NextResponse } from 'next/server';
 import prisma from '../../../lib/prisma.js';
 import { uploadFromBuffer } from '../../../services/cloudinaryService.js';
-import { inferByUrl } from '../../../services/yoloService.js';
+import { inferByUrl } from '../../../services/huggingFaceService.js';
 import { lookupMapping } from '../../../services/labelMappingService.js';
-
 /**
  * POST /api/image
  * Accept image uploads from Raspberry Pi device
- * Uploads to Cloudinary, runs YOLO detection, maps labels to plant types
+ * Uploads to Cloudinary, runs Hugging Face AI model detection, maps labels to plant types
  * 
  * Form data:
  * - device_id: string
@@ -88,36 +87,45 @@ export async function POST(request) {
       where: { imageId: image.id },
     });
 
-    let yoloResult;
+    let aiResult;
     if (!inferenceCache) {
-      // Call YOLO API
-      console.log('Running YOLO inference...');
-      yoloResult = await inferByUrl(cloudinaryResult.secureUrl);
+      // Call Hugging Face AI model
+      console.log('Running Hugging Face AI inference...');
+      aiResult = await inferByUrl(cloudinaryResult.secureUrl);
 
       // Store in cache
       inferenceCache = await prisma.inferenceCache.create({
         data: {
           imageId: image.id,
-          provider: yoloResult.provider,
-          responseJson: yoloResult.error 
-            ? { error: yoloResult.error, detections: [] }
-            : yoloResult.rawResponse,
+          provider: aiResult.provider,
+          responseJson: aiResult.error 
+            ? { error: aiResult.error, detections: [] }
+            : aiResult.rawResponse,
         },
       });
     } else {
-      console.log('Using cached YOLO result');
-      yoloResult = {
+      console.log('Using cached AI inference result');
+      aiResult = {
         detections: [],
         provider: inferenceCache.provider,
         rawResponse: inferenceCache.responseJson,
       };
 
       // Parse detections from cached response
-      if (inferenceCache.responseJson?.predictions) {
-        yoloResult.detections = inferenceCache.responseJson.predictions.map(p => ({
-          label: p.class || p.label,
-          confidence: p.confidence,
-          bbox: { x: p.x, y: p.y, width: p.width, height: p.height },
+      const cachedData = inferenceCache.responseJson;
+      
+      // Handle array response (most common)
+      if (Array.isArray(cachedData)) {
+        aiResult.detections = cachedData.map(item => ({
+          label: item.label || 'unknown',
+          confidence: item.score || item.confidence || 0,
+        }));
+      }
+      // Handle predictions array
+      else if (cachedData?.predictions) {
+        aiResult.detections = cachedData.predictions.map(p => ({
+          label: p.label || p.class || 'unknown',
+          confidence: p.score || p.confidence || 0,
         }));
       }
     }
@@ -127,7 +135,7 @@ export async function POST(request) {
     let dominantDetection = null;
     let maxConfidence = 0;
 
-    for (const det of yoloResult.detections) {
+    for (const det of aiResult.detections) {
       // Map label to plant type/data
       const mapping = await lookupMapping(det.label, det.confidence);
 
@@ -136,7 +144,6 @@ export async function POST(request) {
           imageId: image.id,
           label: det.label,
           confidence: det.confidence,
-          bbox: det.bbox,
           plantTypeId: mapping.plantTypeId,
           plantDataId: mapping.plantDataId,
         },
@@ -170,7 +177,6 @@ export async function POST(request) {
           id: d.id,
           label: d.label,
           confidence: d.confidence,
-          bbox: d.bbox,
           plantType: d.plantType ? {
             id: d.plantType.id,
             name: d.plantType.name,

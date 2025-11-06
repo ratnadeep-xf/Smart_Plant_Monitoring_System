@@ -6,7 +6,7 @@
 
 ### All API Routes Created (10 endpoints):
 1. ✅ `POST /api/telemetry` - Submit sensor readings
-2. ✅ `POST /api/image` - Upload image with YOLO detection
+2. ✅ `POST /api/image` - Upload image with Hugging Face AI detection
 3. ✅ `GET /api/latest` - Get latest sensor + image data
 4. ✅ `GET /api/history` - Query historical readings
 5. ✅ `GET /api/plantData/:id` - Get plant care details
@@ -19,7 +19,7 @@
 ### All Services Converted to ES6:
 - ✅ `lib/prisma.js` - Database client
 - ✅ `services/cloudinaryService.js` - Image upload
-- ✅ `services/yoloService.js` - YOLO detection
+- ✅ `services/huggingFaceService.js` - Hugging Face AI inference
 - ✅ `services/deviceService.js` - Command queue
 - ✅ `services/labelMappingService.js` - Label to plant mapping
 - ✅ `middlewares/authDevice.js` - Bearer token auth
@@ -49,9 +49,12 @@ DEVICE_TOKEN_SECRET="your-secret-token"
 CLOUDINARY_CLOUD_NAME="your-cloud-name"
 CLOUDINARY_API_KEY="your-api-key"
 CLOUDINARY_API_SECRET="your-api-secret"
-YOLO_API_URL="https://detect.roboflow.com/your-model/1"
-YOLO_API_KEY="your-yolo-key"
+HF_API_URL="https://api-inference.huggingface.co/models/your-username/your-model"
+HF_API_TOKEN="hf_your_token_here"
+HF_TIMEOUT_MS="30000"
 ```
+
+**See `HUGGING_FACE_SETUP.md` for detailed Hugging Face configuration guide.**
 
 ### 3. Run Database Migrations
 ```bash
@@ -65,7 +68,7 @@ npm run db:seed
 This creates:
 - 4 plant types (Basil, Mint, Rosemary, Tomato)
 - 4 plant data records (care instructions)
-- 7 label mappings (YOLO labels → plants)
+- 7 label mappings (AI model labels → plants)
 
 ### 5. Start Development Server
 ```bash
@@ -155,16 +158,18 @@ Authorization: Bearer YOUR_DEVICE_TOKEN_SECRET
 ### Image Upload Flow
 1. Client uploads image via multipart/form-data
 2. Backend uploads to Cloudinary
-3. Checks InferenceCache for existing YOLO results
-4. If not cached, calls YOLO API for plant detection
+3. Checks InferenceCache for existing AI results
+4. If not cached, calls Hugging Face API for plant detection/classification
 5. Maps detected labels to PlantType/PlantData
 6. Stores Detection records with plant info
 7. Returns image URL, detections, and plant care data
 
-### YOLO Integration
-- Provider detection (Roboflow vs Ultralytics)
+### Hugging Face AI Integration
+- Supports object detection models (with bounding boxes)
+- Supports image classification models
 - Retry logic (3 attempts, exponential backoff)
-- Response normalization
+- Handles model loading delays (503 errors)
+- Response normalization for various formats
 - Inference caching (avoid redundant API calls)
 - Label mapping to plant database
 
@@ -183,18 +188,17 @@ Authorization: Bearer YOUR_DEVICE_TOKEN_SECRET
 - `PlantData` - Detailed care instructions
 - `Reading` - Sensor telemetry from device
 - `Image` - Cloudinary uploads with metadata
-- `Detection` - YOLO results linked to plants
-- `InferenceCache` - Cached YOLO responses
-- `LabelMapping` - YOLO label → PlantType/PlantData
+- `Detection` - AI detection results linked to plants
+- `InferenceCache` - Cached AI inference responses
+- `LabelMapping` - AI model label → PlantType/PlantData
 
 ---
 
 ## 📖 Documentation
 
-See `API_ROUTES_SUMMARY.md` for detailed API documentation including:
-- All endpoint specifications
-- Request/response examples
-- Service function references
-- Environment variable requirements
+- **`API_ROUTES_SUMMARY.md`** - Complete API documentation with all endpoints
+- **`HUGGING_FACE_SETUP.md`** - Detailed guide for setting up Hugging Face AI models
+- **`README.md`** - Project overview and getting started
+- **`.env.example`** - Environment variables template
 
 ---

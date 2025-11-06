@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { toast, Toaster } from 'sonner';
 import DashboardHeader from '@/components/DashboardHeader';
 import GaugeCard from '@/components/GaugeCard';
 import ImageCard from '@/components/ImageCard';
 import ControlPanel from '@/components/ControlPanel';
-import AlertBanner from '@/components/AlertBanner';
 import SparklineChart from '@/components/SparklineChart';
+import ImageUploadButton from '@/components/ImageUploadButton';
 import '@/styles/animations.css';
 
 export default function Dashboard() {
@@ -48,9 +49,6 @@ export default function Dashboard() {
     cooldownTime: null,
     duration: 5
   });
-  
-  // State for alerts
-  const [alerts, setAlerts] = useState([]);
   
   // Fetch latest data from API
   const fetchLatestData = async () => {
@@ -148,20 +146,14 @@ export default function Dashboard() {
           cooldownTime: data.data.nextAllowedAt
         }));
         
-        setAlerts(prev => [
-          ...prev,
-          { id: Date.now(), message: `Watering command sent (${wateringState.duration}s)` }
-        ]);
+        toast.success(`Watering command sent (${wateringState.duration}s)`);
       }
     } catch (error) {
       console.error('Error watering plant:', error);
       setWateringState(prev => ({ ...prev, isLoading: false }));
       
       const message = error.response?.data?.message || 'Error: Could not connect to device';
-      setAlerts(prev => [
-        ...prev,
-        { id: Date.now(), message }
-      ]);
+      toast.error(message);
     }
   };
   
@@ -171,8 +163,35 @@ export default function Dashboard() {
     setWateringState(prev => ({ ...prev, duration: newDuration }));
   };
   
-  // Dismiss all alerts
-  const dismissAlerts = () => setAlerts([]);
+  // Handle image upload success
+  const handleUploadSuccess = (data) => {
+    const { image, detections, dominant } = data;
+    
+    if (image && dominant) {
+      const detection = detections.find(d => d.label === dominant.label);
+      
+      setPlantData({
+        imageUrl: image.url,
+        plantLabel: dominant.label,
+        confidence: dominant.confidence,
+        lastUpdated: new Date(image.timestamp).toLocaleString(),
+        plantType: detection?.plantType || null,
+        plantInfo: detection?.plantData || null,
+      });
+      
+      toast.success(`Plant identified: ${dominant.label} (${(dominant.confidence * 100).toFixed(1)}% confidence)`);
+      
+      // Refresh data to show the new upload
+      fetchLatestData();
+    } else {
+      toast.warning('Image uploaded but no plant detected');
+    }
+  };
+  
+  // Handle image upload error
+  const handleUploadError = (message) => {
+    toast.error(`Upload error: ${message}`);
+  };
   
   // Initial data fetch
   useEffect(() => {
@@ -243,6 +262,15 @@ export default function Dashboard() {
         
         {/* Center Column - Camera */}
         <div className="md:col-span-6 space-y-6">
+          {/* Image Upload Button */}
+          <div className="p-5 rounded-lg bg-gray-800 shadow-lg border border-gray-700">
+            <h2 className="text-lg font-bold mb-3 text-white">Identify Your Plant</h2>
+            <ImageUploadButton 
+              onUploadSuccess={handleUploadSuccess}
+              onUploadError={handleUploadError}
+            />
+          </div>
+          
           <ImageCard 
             imageUrl={plantData.imageUrl}
             plantLabel={plantData.plantLabel}

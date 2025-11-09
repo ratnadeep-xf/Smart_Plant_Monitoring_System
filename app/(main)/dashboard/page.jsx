@@ -9,7 +9,6 @@ import GaugeCard from '@/components/GaugeCard';
 import ImageCard from '@/components/ImageCard';
 import ControlPanel from '@/components/ControlPanel';
 import SparklineChart from '@/components/SparklineChart';
-import ImageUploadButton from '@/components/ImageUploadButton';
 import '@/styles/animations.css';
 
 export default function Dashboard() {
@@ -234,15 +233,6 @@ export default function Dashboard() {
         
         {/* Center Column - Camera */}
         <div className="md:col-span-6 space-y-6">
-          {/* Image Upload Button */}
-          <div className="p-5 rounded-lg bg-gray-800 shadow-lg border border-gray-700">
-            <h2 className="text-lg font-bold mb-3 text-white">Identify Your Plant</h2>
-            <ImageUploadButton 
-              onUploadSuccess={handleUploadSuccess}
-              onUploadError={handleUploadError}
-            />
-          </div>
-          
           <ImageCard 
             imageUrl={plantData.imageUrl}
             plantLabel={plantData.plantLabel}

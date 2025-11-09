@@ -13,19 +13,18 @@ datasource db {
 // =====================================================
 
 model PlantType {
-  id         String    @id @default(uuid())
-  name       String    @unique
-  thresholds Json      // { soil_min, soil_max, temp_min, temp_max, humidity_min, humidity_max, light_min, light_max }
+  id         Int      @id @default(autoincrement())
+  name       String   @unique
+  thresholds Json     // { soil_min, soil_max, temp_min, temp_max, humidity_min, humidity_max, light_min, light_max }
   notes      String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
   detections      Detection[]
-  labelMappings   LabelMapping[]
 }
 
 model PlantData {
-  id                       String   @id @default(uuid())
+  id                       Int      @id @default(autoincrement())
   commonName               String   @map("common_name")
   wateringAmountMl         Float?   @map("watering_amount_ml")
   wateringFrequencyDays    Int?     @map("watering_frequency_days")
@@ -34,8 +33,6 @@ model PlantData {
   idealHumidityPercent     Float?   @map("ideal_humidity_percent")
   fertilizerType           String?  @map("fertilizer_type")
   idealFertilizerAmountMl  Float?   @map("ideal_fertilizer_amount_ml")
-  pestPresence             Boolean? @map("pest_presence")
-  pestSeverity             String?  @map("pest_severity")
   idealSoilMoisturePercent Float?   @map("ideal_soil_moisture_percent")
   idealSoilType            String?  @map("ideal_soil_type")
 
@@ -43,7 +40,6 @@ model PlantData {
   updatedAt DateTime @updatedAt
 
   detections      Detection[]
-  labelMappings   LabelMapping[]
 }
 
 model Image {
@@ -75,9 +71,9 @@ model Detection {
   image        Image      @relation(fields: [imageId], references: [id], onDelete: Cascade)
   imageId      String
   plantType    PlantType? @relation(fields: [plantTypeId], references: [id])
-  plantTypeId  String?
+  plantTypeId  Int?
   plantData    PlantData? @relation(fields: [plantDataId], references: [id])
-  plantDataId  String?
+  plantDataId  Int?
 
   label        String
   confidence   Float
@@ -118,20 +114,18 @@ model InferenceCache {
   @@index([provider, createdAt])
 }
 
-/// Map YOLO label strings to PlantType and PlantData rows.
-/// Use `minConfidence` to require a minimum confidence before accepting the mapping.
-model LabelMapping {
-  id            String     @id @default(uuid())
-  label         String     @unique
-  normalized    String?    // optional normalized label for fuzzy matching
-  plantType     PlantType? @relation(fields: [plantTypeId], references: [id], onDelete: Cascade)
-  plantTypeId   String?
-  plantData     PlantData? @relation(fields: [plantDataId], references: [id], onDelete: Cascade)
-  plantDataId   String?
-  minConfidence Float?     @default(0.5) // threshold to accept mapping
-  notes         String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+/// Queue commands for Raspberry Pi devices (e.g., water pump activation)
+model Command {
+  id          String   @id @default(uuid())
+  deviceId    String   @map("device_id")
+  type        String   // "water", "calibrate", etc.
+  payload     Json?    // Command-specific data (e.g., { duration: 5 })
+  status      String   @default("pending") // "pending", "completed", "failed", "cancelled"
+  result      Json?    // Result data from device execution
+  createdAt   DateTime @default(now()) @map("created_at")
+  completedAt DateTime? @map("completed_at")
+  error       String?  // Error message if failed
 
-  @@index([label])
+  @@index([deviceId, status])
+  @@index([createdAt])
 }

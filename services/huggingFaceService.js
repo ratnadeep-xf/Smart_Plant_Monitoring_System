@@ -47,7 +47,10 @@ export async function inferByUrl(imageUrl) {
         img: imageBlob, 
       });
 
-      console.log('Gradio result:', result.data);
+      console.log('=== GRADIO RAW RESPONSE ===');
+      console.log('Type:', typeof result.data);
+      console.log('Data:', JSON.stringify(result.data, null, 2));
+      console.log('=== END GRADIO RESPONSE ===');
 
       const detections = normalizeGradioResponse(result.data);
 
@@ -83,15 +86,21 @@ export async function inferByUrl(imageUrl) {
 function normalizeGradioResponse(responseData) {
   const detections = [];
 
+  console.log('=== NORMALIZING RESPONSE ===');
+  console.log('Input type:', typeof responseData);
+  console.log('Is Array:', Array.isArray(responseData));
+  console.log('Input data:', JSON.stringify(responseData, null, 2));
+
   // Handle array response (most common)
   if (Array.isArray(responseData)) {
     for (const item of responseData) {
       // If item is an object with label/confidence
       if (typeof item === 'object' && item !== null) {
-        if (item.label && (item.score !== undefined || item.confidence !== undefined)) {
+        // If it has a label field (even without confidence score)
+        if (item.label) {
           detections.push({
             label: item.label,
-            confidence: item.score || item.confidence || 0,
+            confidence: item.score || item.confidence || 0.9, // Default to 0.9 if no confidence provided
           });
         }
       }
@@ -139,6 +148,11 @@ function normalizeGradioResponse(responseData) {
       confidence: 1.0,
     });
   }
+
+  console.log('=== DETECTIONS RESULT ===');
+  console.log('Count:', detections.length);
+  console.log('Detections:', JSON.stringify(detections, null, 2));
+  console.log('=== END NORMALIZATION ===');
 
   return detections;
 }

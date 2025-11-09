@@ -194,8 +194,6 @@ export async function POST(request) {
             idealSoilType: d.plantData.idealSoilType,
             fertilizerType: d.plantData.fertilizerType,
             idealFertilizerAmountMl: d.plantData.idealFertilizerAmountMl,
-            pestPresence: d.plantData.pestPresence,
-            pestSeverity: d.plantData.pestSeverity,
           } : null,
         })),
         dominant: dominantDetection ? {

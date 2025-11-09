@@ -108,8 +108,6 @@ async function main() {
         idealSoilType: 'Well-draining potting mix',
         fertilizerType: 'Balanced NPK (10-10-10)',
         idealFertilizerAmountMl: 50,
-        pestPresence: false,
-        pestSeverity: null,
       },
     });
   }
@@ -132,8 +130,6 @@ async function main() {
         idealSoilType: 'Rich, moist soil',
         fertilizerType: 'Organic compost',
         idealFertilizerAmountMl: 30,
-        pestPresence: false,
-        pestSeverity: null,
       },
     });
   }
@@ -156,8 +152,6 @@ async function main() {
         idealSoilType: 'Sandy, well-draining soil',
         fertilizerType: 'Low-nitrogen fertilizer',
         idealFertilizerAmountMl: 20,
-        pestPresence: false,
-        pestSeverity: null,
       },
     });
   }
@@ -180,111 +174,10 @@ async function main() {
         idealSoilType: 'Rich, well-draining soil with organic matter',
         fertilizerType: 'Tomato-specific fertilizer (5-10-10)',
         idealFertilizerAmountMl: 100,
-        pestPresence: false,
-        pestSeverity: null,
       },
     });
   }
   console.log('Created plant data: Cherry Tomato');
-
-  // Create label mappings (YOLO labels to PlantType/PlantData)
-  await prisma.labelMapping.upsert({
-    where: { label: 'basil' },
-    update: {},
-    create: {
-      label: 'basil',
-      normalized: 'basil',
-      plantTypeId: basil.id,
-      plantDataId: basilData.id,
-      minConfidence: 0.5,
-      notes: 'Common basil detection',
-    },
-  });
-  console.log('Created label mapping: basil');
-
-  await prisma.labelMapping.upsert({
-    where: { label: 'sweet basil' },
-    update: {},
-    create: {
-      label: 'sweet basil',
-      normalized: 'basil',
-      plantTypeId: basil.id,
-      plantDataId: basilData.id,
-      minConfidence: 0.5,
-      notes: 'Sweet basil variant',
-    },
-  });
-  console.log('Created label mapping: sweet basil');
-
-  await prisma.labelMapping.upsert({
-    where: { label: 'mint' },
-    update: {},
-    create: {
-      label: 'mint',
-      normalized: 'mint',
-      plantTypeId: mint.id,
-      plantDataId: mintData.id,
-      minConfidence: 0.5,
-      notes: 'Generic mint detection',
-    },
-  });
-  console.log('Created label mapping: mint');
-
-  await prisma.labelMapping.upsert({
-    where: { label: 'peppermint' },
-    update: {},
-    create: {
-      label: 'peppermint',
-      normalized: 'mint',
-      plantTypeId: mint.id,
-      plantDataId: mintData.id,
-      minConfidence: 0.5,
-      notes: 'Peppermint variant',
-    },
-  });
-  console.log('Created label mapping: peppermint');
-
-  await prisma.labelMapping.upsert({
-    where: { label: 'rosemary' },
-    update: {},
-    create: {
-      label: 'rosemary',
-      normalized: 'rosemary',
-      plantTypeId: rosemary.id,
-      plantDataId: rosemaryData.id,
-      minConfidence: 0.5,
-      notes: 'Rosemary detection',
-    },
-  });
-  console.log('Created label mapping: rosemary');
-
-  await prisma.labelMapping.upsert({
-    where: { label: 'tomato' },
-    update: {},
-    create: {
-      label: 'tomato',
-      normalized: 'tomato',
-      plantTypeId: tomato.id,
-      plantDataId: tomatoData.id,
-      minConfidence: 0.6,
-      notes: 'Tomato plant detection',
-    },
-  });
-  console.log('Created label mapping: tomato');
-
-  await prisma.labelMapping.upsert({
-    where: { label: 'cherry tomato' },
-    update: {},
-    create: {
-      label: 'cherry tomato',
-      normalized: 'tomato',
-      plantTypeId: tomato.id,
-      plantDataId: tomatoData.id,
-      minConfidence: 0.6,
-      notes: 'Cherry tomato variant',
-    },
-  });
-  console.log('Created label mapping: cherry tomato');
 
   console.log('Database seeding completed successfully!');
 }

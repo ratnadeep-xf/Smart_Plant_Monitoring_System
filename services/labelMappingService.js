@@ -2,11 +2,10 @@
 import prisma from '../lib/prisma.js';
 
 /**
- * Look up label mapping for a detection label
- * Normalizes the label (lowercase, trim) and checks against LabelMapping table
- * Returns plantTypeId and plantDataId only if confidence meets minimum threshold
+ * Look up plant data for a detection label by direct name matching
+ * Matches against PlantType.name and PlantData.commonName (case-insensitive)
  * 
- * @param {string} label - Detection label from YOLO
+ * @param {string} label - Detection label from AI model
  * @param {number} confidence - Detection confidence (0-1)
  * @returns {Promise<object>} Mapping result with plant type and data IDs if matched
  */
@@ -15,52 +14,51 @@ export async function lookupMapping(label, confidence) {
     // Normalize the label for case-insensitive matching
     const normalizedLabel = label.toLowerCase().trim();
 
-    // Query the LabelMapping table
-    const mapping = await prisma.labelMapping.findFirst({
+    // Try direct name matching in PlantType table
+    const plantType = await prisma.plantType.findFirst({
       where: {
-        OR: [
-          { label: { equals: label, mode: 'insensitive' } },
-          { normalized: normalizedLabel },
-        ],
+        name: { equals: label, mode: 'insensitive' },
       },
       select: {
-        plantTypeId: true,
-        plantDataId: true,
-        minConfidence: true,
+        id: true,
+        name: true,
       },
     });
 
-    // If no mapping found, return unmatched result
-    if (!mapping) {
-      console.log(`No label mapping found for: ${label}`);
+    // Try direct name matching in PlantData table
+    const plantData = await prisma.plantData.findFirst({
+      where: {
+        commonName: { equals: label, mode: 'insensitive' },
+      },
+      select: {
+        id: true,
+        commonName: true,
+      },
+    });
+
+    // If we found either PlantType or PlantData by direct name match
+    if (plantType || plantData) {
+      console.log(`Found match for "${label}": PlantType=${plantType?.name || 'none'}, PlantData=${plantData?.commonName || 'none'}`);
       return {
-        plantTypeId: null,
-        plantDataId: null,
-        matched: false,
-        minConfidence: 0,
+        plantTypeId: plantType?.id || null,
+        plantDataId: plantData?.id || null,
+        matched: true,
+        minConfidence: 0.5,
         actualConfidence: confidence,
       };
     }
 
-    // Check if confidence meets minimum threshold
-    const minConfidence = mapping.minConfidence || 0.5;
-    const meetsThreshold = confidence >= minConfidence;
-
-    if (!meetsThreshold) {
-      console.log(
-        `Label "${label}" confidence ${confidence} below minimum ${minConfidence}`
-      );
-    }
-
+    // No match found
+    console.log(`No plant data found for: ${label}`);
     return {
-      plantTypeId: meetsThreshold ? mapping.plantTypeId : null,
-      plantDataId: meetsThreshold ? mapping.plantDataId : null,
-      matched: meetsThreshold,
-      minConfidence,
+      plantTypeId: null,
+      plantDataId: null,
+      matched: false,
+      minConfidence: 0,
       actualConfidence: confidence,
     };
   } catch (error) {
-    console.error('Error looking up label mapping:', error);
+    console.error('Error looking up plant data:', error);
     return {
       plantTypeId: null,
       plantDataId: null,
@@ -72,47 +70,25 @@ export async function lookupMapping(label, confidence) {
 }
 
 /**
- * Create or update a label mapping
- * @param {string} label - Detection label
- * @param {string|null} plantTypeId - Plant type ID (optional)
- * @param {string|null} plantDataId - Plant data ID (optional)
- * @param {number} minConfidence - Minimum confidence threshold
- * @returns {Promise<object>} Created or updated mapping
+ * Get all plant types
+ * @returns {Promise<Array>} Array of all plant types
  */
-export async function upsertMapping(label, plantTypeId, plantDataId, minConfidence = 0.5) {
-  const normalizedLabel = label.toLowerCase().trim();
-
-  return await prisma.labelMapping.upsert({
-    where: { label },
-    update: {
-      normalized: normalizedLabel,
-      plantTypeId,
-      plantDataId,
-      minConfidence,
-      updatedAt: new Date(),
-    },
-    create: {
-      label,
-      normalized: normalizedLabel,
-      plantTypeId,
-      plantDataId,
-      minConfidence,
+export async function getAllPlantTypes() {
+  return await prisma.plantType.findMany({
+    orderBy: {
+      name: 'asc',
     },
   });
 }
 
 /**
- * Get all label mappings
- * @returns {Promise<Array>} Array of all label mappings with related plant data
+ * Get all plant data
+ * @returns {Promise<Array>} Array of all plant data
  */
-export async function getAllMappings() {
-  return await prisma.labelMapping.findMany({
-    include: {
-      plantType: true,
-      plantData: true,
-    },
+export async function getAllPlantData() {
+  return await prisma.plantData.findMany({
     orderBy: {
-      createdAt: 'desc',
+      commonName: 'asc',
     },
   });
 }

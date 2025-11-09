@@ -165,10 +165,17 @@ export default function Dashboard() {
   
   // Handle image upload success
   const handleUploadSuccess = (data) => {
+    console.log('=== UPLOAD SUCCESS ===');
+    console.log('Full data:', JSON.stringify(data, null, 2));
+    
     const { image, detections, dominant } = data;
     
     if (image && dominant) {
       const detection = detections.find(d => d.label === dominant.label);
+      
+      console.log('Detection found:', detection);
+      console.log('PlantType:', detection?.plantType);
+      console.log('PlantData:', detection?.plantData);
       
       setPlantData({
         imageUrl: image.url,
@@ -211,8 +218,7 @@ export default function Dashboard() {
   
   return (
     <main className="container mx-auto px-4 py-6">
-      {/* Alerts Banner */}
-      <AlertBanner alerts={alerts} onDismiss={dismissAlerts} />
+      <Toaster position="top-right" richColors />
       
       {/* Dashboard Header */}
       <DashboardHeader 
@@ -323,7 +329,7 @@ export default function Dashboard() {
           {/* Plant Info Card */}
           <div className="p-5 rounded-lg bg-gray-800 shadow-lg border border-gray-700">
             <h2 className="text-xl font-bold mb-3">Plant Information</h2>
-            {plantData.plantLabel && plantData.plantInfo ? (
+            {plantData.plantLabel ? (
               <div className="space-y-3">
                 <div className="flex justify-between border-b border-gray-700 pb-2">
                   <span className="text-gray-400">Detected:</span>
@@ -335,50 +341,60 @@ export default function Dashboard() {
                   <span className="font-medium text-green-400">{(plantData.confidence * 100).toFixed(1)}%</span>
                 </div>
                 
-                <div className="flex justify-between border-b border-gray-700 pb-2">
-                  <span className="text-gray-400">Common Name:</span>
-                  <span className="font-medium text-white">{plantData.plantInfo.commonName}</span>
-                </div>
-                
-                {plantData.plantInfo.scientificName && (
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Scientific Name:</span>
-                    <span className="font-medium text-white italic text-sm">{plantData.plantInfo.scientificName}</span>
-                  </div>
-                )}
-                
-                {plantData.plantInfo.wateringFrequencyDays && (
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Watering:</span>
-                    <span className="font-medium text-white">Every {plantData.plantInfo.wateringFrequencyDays} day(s)</span>
-                  </div>
-                )}
-                
-                {plantData.plantInfo.idealSunlightExposure && (
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Ideal Sunlight:</span>
-                    <span className="font-medium text-white text-right text-sm">{plantData.plantInfo.idealSunlightExposure}</span>
-                  </div>
-                )}
-                
-                {plantData.plantInfo.idealRoomTemperatureC && (
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Ideal Temperature:</span>
-                    <span className="font-medium text-white">{plantData.plantInfo.idealRoomTemperatureC}°C</span>
-                  </div>
-                )}
-                
-                {plantData.plantInfo.idealHumidityPercent && (
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Ideal Humidity:</span>
-                    <span className="font-medium text-white">{plantData.plantInfo.idealHumidityPercent}%</span>
-                  </div>
-                )}
-                
-                {plantData.plantInfo.idealSoilMoisturePercent && (
-                  <div className="flex justify-between border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Ideal Moisture:</span>
-                    <span className="font-medium text-white">{plantData.plantInfo.idealSoilMoisturePercent}%</span>
+                {plantData.plantInfo ? (
+                  <>
+                    <div className="flex justify-between border-b border-gray-700 pb-2">
+                      <span className="text-gray-400">Common Name:</span>
+                      <span className="font-medium text-white">{plantData.plantInfo.commonName}</span>
+                    </div>
+                    
+                    {plantData.plantInfo.scientificName && (
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">Scientific Name:</span>
+                        <span className="font-medium text-white italic text-sm">{plantData.plantInfo.scientificName}</span>
+                      </div>
+                    )}
+                    
+                    {plantData.plantInfo.wateringFrequencyDays && (
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">Watering:</span>
+                        <span className="font-medium text-white">Every {plantData.plantInfo.wateringFrequencyDays} day(s)</span>
+                      </div>
+                    )}
+                    
+                    {plantData.plantInfo.idealSunlightExposure && (
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">Ideal Sunlight:</span>
+                        <span className="font-medium text-white text-right text-sm">{plantData.plantInfo.idealSunlightExposure}</span>
+                      </div>
+                    )}
+                    
+                    {plantData.plantInfo.idealRoomTemperatureC && (
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">Ideal Temperature:</span>
+                        <span className="font-medium text-white">{plantData.plantInfo.idealRoomTemperatureC}°C</span>
+                      </div>
+                    )}
+                    
+                    {plantData.plantInfo.idealHumidityPercent && (
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">Ideal Humidity:</span>
+                        <span className="font-medium text-white">{plantData.plantInfo.idealHumidityPercent}%</span>
+                      </div>
+                    )}
+                    
+                    {plantData.plantInfo.idealSoilMoisturePercent && (
+                      <div className="flex justify-between border-b border-gray-700 pb-2">
+                        <span className="text-gray-400">Ideal Moisture:</span>
+                        <span className="font-medium text-white">{plantData.plantInfo.idealSoilMoisturePercent}%</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="bg-yellow-900/20 border border-yellow-700 rounded p-3 mt-3">
+                    <p className="text-yellow-400 text-sm">
+                      Plant detected but no care information available in database.
+                    </p>
                   </div>
                 )}
                 
@@ -389,12 +405,14 @@ export default function Dashboard() {
                   </div>
                 </div>
                 
-                <button
-                  onClick={() => router.push('/plant-details')}
-                  className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors font-medium"
-                >
-                  View Full Details
-                </button>
+                {plantData.plantInfo && (
+                  <button
+                    onClick={() => router.push('/plant-details')}
+                    className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors font-medium"
+                  >
+                    View Full Details
+                  </button>
+                )}
               </div>
             ) : (
               <div className="text-center py-6">

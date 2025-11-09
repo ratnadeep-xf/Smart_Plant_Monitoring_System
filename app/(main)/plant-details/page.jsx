@@ -252,29 +252,6 @@ export default function PlantDetailPage() {
                 )}
               </div>
             </div>
-
-            {/* Pest Information */}
-            {(plantData.pestPresence !== null || plantData.pestSeverity) && (
-              <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                <h2 className="text-xl font-bold mb-4">Pest Information</h2>
-                <div className="space-y-3">
-                  {plantData.pestPresence !== null && (
-                    <div className="flex justify-between border-b border-gray-700 pb-2">
-                      <span className="text-gray-400">Pest Presence:</span>
-                      <span className={`font-medium ${plantData.pestPresence ? 'text-red-400' : 'text-green-400'}`}>
-                        {plantData.pestPresence ? 'Detected' : 'None'}
-                      </span>
-                    </div>
-                  )}
-                  {plantData.pestSeverity && (
-                    <div className="flex justify-between border-b border-gray-700 pb-2">
-                      <span className="text-gray-400">Severity:</span>
-                      <span className="font-medium text-yellow-400">{plantData.pestSeverity}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

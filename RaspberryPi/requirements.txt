@@ -1,0 +1,19 @@
+# Python dependencies for Raspberry Pi Plant Monitoring System
+
+# HTTP requests
+requests>=2.31.0
+
+# Raspberry Pi GPIO
+RPi.GPIO>=0.7.1
+
+# Camera support
+picamera>=1.13
+
+# DHT temperature/humidity sensor
+Adafruit-DHT>=1.4.0
+
+# Image processing
+Pillow>=10.0.0
+
+# Optional: For better logging
+coloredlogs>=15.0.1

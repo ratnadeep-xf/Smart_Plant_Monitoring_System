@@ -1,19 +1,24 @@
 """
 Sensor reading module for Raspberry Pi Plant Monitoring System
-Handles reading from soil moisture, temperature, humidity, and light sensors
+Handles reading from digital GPIO sensors (D0 pins - no MCP3008 ADC)
+
+Sensors:
+- DHT22: Temperature & Humidity on GPIO 4
+- Soil Moisture D0: Digital output on GPIO 27 (0=wet, 1=dry)
+- LDR Light D0: Digital output on GPIO 17 (0=bright, 1=dark)
 """
 
 import time
 import random
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 try:
     import RPi.GPIO as GPIO
-    import Adafruit_DHT
+    import adafruit_dht
     RPI_AVAILABLE = True
 except ImportError:
     RPI_AVAILABLE = False
-    print("Warning: RPi.GPIO or Adafruit_DHT not available. Using mock sensors.")
+    print("Warning: RPi.GPIO or adafruit_dht not available. Using mock sensors.")
 
 from config import *
 
@@ -26,125 +31,87 @@ class SensorReader:
         Initialize sensor reader
         
         Args:
-            use_mock: Use mock data instead of real sensors (for testing)
+            use_mock: Use mock sensors for testing without hardware
         """
         self.use_mock = use_mock or not RPI_AVAILABLE
         
         if not self.use_mock:
+            # Initialize GPIO
             GPIO.setmode(GPIO.BCM)
             GPIO.setwarnings(False)
+
+            # Setup digital input pins
+            if ENABLE_SOIL_SENSOR:
+                GPIO.setup(SOIL_SENSOR_PIN, GPIO.IN)
+                print(f"✓ Soil moisture sensor initialized on GPIO {SOIL_SENSOR_PIN}")
             
-            # Initialize ADC for analog sensors if enabled
-            if ADC_ENABLED:
-                self._init_adc()
+            if ENABLE_LIGHT_SENSOR:
+                GPIO.setup(LIGHT_SENSOR_PIN, GPIO.IN)
+                print(f"✓ Light sensor (LDR) initialized on GPIO {LIGHT_SENSOR_PIN}")
+            
+            if ENABLE_TEMPERATURE_SENSOR or ENABLE_HUMIDITY_SENSOR:
+                print(f"✓ DHT22 sensor initialized on GPIO {TEMPERATURE_HUMIDITY_PIN}")
         
         self.last_reading = None
         print(f"SensorReader initialized (mock={'ON' if self.use_mock else 'OFF'})")
-    
-    def _init_adc(self):
-        """Initialize MCP3008 ADC for analog sensors"""
-        try:
-            GPIO.setup(ADC_CLK_PIN, GPIO.OUT)
-            GPIO.setup(ADC_DOUT_PIN, GPIO.IN)
-            GPIO.setup(ADC_DIN_PIN, GPIO.OUT)
-            GPIO.setup(ADC_CS_PIN, GPIO.OUT)
-            print("ADC initialized successfully")
-        except Exception as e:
-            print(f"Error initializing ADC: {e}")
-    
-    def _read_adc(self, channel: int) -> int:
-        """
-        Read from MCP3008 ADC channel
-        
-        Args:
-            channel: ADC channel (0-7)
-            
-        Returns:
-            ADC value (0-1023)
-        """
-        if self.use_mock:
-            return random.randint(0, 1023)
-        
-        try:
-            GPIO.output(ADC_CS_PIN, GPIO.HIGH)
-            GPIO.output(ADC_CLK_PIN, GPIO.LOW)
-            GPIO.output(ADC_CS_PIN, GPIO.LOW)
-            
-            command = channel
-            command |= 0x18  # Start bit + single-ended bit
-            command <<= 3
-            
-            for i in range(5):
-                if command & 0x80:
-                    GPIO.output(ADC_DIN_PIN, GPIO.HIGH)
-                else:
-                    GPIO.output(ADC_DIN_PIN, GPIO.LOW)
-                command <<= 1
-                GPIO.output(ADC_CLK_PIN, GPIO.HIGH)
-                GPIO.output(ADC_CLK_PIN, GPIO.LOW)
-            
-            result = 0
-            for i in range(12):
-                GPIO.output(ADC_CLK_PIN, GPIO.HIGH)
-                GPIO.output(ADC_CLK_PIN, GPIO.LOW)
-                result <<= 1
-                if GPIO.input(ADC_DOUT_PIN):
-                    result |= 0x1
-            
-            GPIO.output(ADC_CS_PIN, GPIO.HIGH)
-            result >>= 1
-            return result
-            
-        except Exception as e:
-            print(f"Error reading ADC channel {channel}: {e}")
-            return 0
-    
+
+    # ================================================================
+    # Sensor reading functions
+    # ================================================================
+
     def read_soil_moisture(self) -> Optional[float]:
         """
-        Read soil moisture percentage
+        Read soil moisture percentage from digital D0 pin
+        
+        Digital output: 0 = wet soil, 1 = dry soil
         
         Returns:
-            Soil moisture percentage (0-100) or None if error
+            Soil moisture percentage (0-100)
         """
         if not ENABLE_SOIL_SENSOR:
             return None
         
         if self.use_mock:
+            # Mock returns random value between 30-70%
             return round(random.uniform(30, 70), 1)
-        
+
         try:
-            # Read from ADC channel 0
-            raw_value = self._read_adc(0)
+            # Read digital value from D0 pin
+            digital_value = GPIO.input(SOIL_SENSOR_PIN)
             
-            # Convert to percentage (inverted - lower value = wetter soil)
-            percentage = 100 - ((raw_value - SOIL_SENSOR_MIN) / 
-                               (SOIL_SENSOR_MAX - SOIL_SENSOR_MIN) * 100)
+            # Map digital value to percentage
+            # 0 (LOW) = wet soil → higher percentage (e.g., 80%)
+            # 1 (HIGH) = dry soil → lower percentage (e.g., 20%)
+            if digital_value == SOIL_DIGITAL_WET_VALUE:
+                percentage = SOIL_WET_PERCENTAGE
+            else:
+                percentage = SOIL_DRY_PERCENTAGE
             
-            # Clamp to 0-100
-            percentage = max(0, min(100, percentage))
+            if DEBUG_MODE:
+                print(f"Soil sensor D0={digital_value} → {percentage}%")
             
-            return round(percentage, 1)
-            
+            return float(percentage)
+
         except Exception as e:
             print(f"Error reading soil moisture: {e}")
             return None
-    
-    def read_temperature_humidity(self) -> tuple[Optional[float], Optional[float]]:
+
+    def read_temperature_humidity(self) -> Tuple[Optional[float], Optional[float]]:
         """
-        Read temperature and humidity from DHT sensor
+        Read temperature and humidity from DHT22 sensor
         
         Returns:
-            Tuple of (temperature_celsius, humidity_percent)
+            Tuple of (temperature_celsius, humidity_percentage)
         """
         if self.use_mock:
             temp = round(random.uniform(18, 28), 1) if ENABLE_TEMPERATURE_SENSOR else None
             humid = round(random.uniform(40, 70), 1) if ENABLE_HUMIDITY_SENSOR else None
             return temp, humid
-        
+
         try:
-            # DHT22 sensor (change to Adafruit_DHT.DHT11 if using DHT11)
-            humidity, temperature = Adafruit_DHT.read_retry(
-                Adafruit_DHT.DHT22,
+            # Read from DHT22 sensor with retries
+            humidity, temperature = adafruit_dht.read_retry(
+             adafruit_dht.DHT22,
                 TEMPERATURE_HUMIDITY_PIN,
                 retries=3,
                 delay_seconds=2
@@ -152,56 +119,74 @@ class SensorReader:
             
             # Validate readings
             if humidity is not None and (humidity < 0 or humidity > 100):
+                print(f"Invalid humidity reading: {humidity}%")
                 humidity = None
             
             if temperature is not None and (temperature < -40 or temperature > 80):
+                print(f"Invalid temperature reading: {temperature}°C")
                 temperature = None
             
+            # Round and apply enable flags
             temp = round(temperature, 1) if temperature is not None and ENABLE_TEMPERATURE_SENSOR else None
             humid = round(humidity, 1) if humidity is not None and ENABLE_HUMIDITY_SENSOR else None
             
-            return temp, humid
+            if DEBUG_MODE and (temp is not None or humid is not None):
+                print(f"DHT22: Temp={temp}°C, Humidity={humid}%")
             
+            return temp, humid
+
         except Exception as e:
-            print(f"Error reading DHT sensor: {e}")
+            print(f"Error reading DHT22 sensor: {e}")
             return None, None
-    
+
     def read_light_level(self) -> Optional[float]:
         """
-        Read light level in lux
+        Read light level from digital LDR module D0 pin
+        
+        Digital output: 0 = bright light, 1 = dark/low light
         
         Returns:
-            Light level in lux or None if error
+            Approximate lux value
         """
         if not ENABLE_LIGHT_SENSOR:
             return None
         
         if self.use_mock:
+            # Mock returns random value between 200-1500 lux
             return round(random.uniform(200, 1500), 0)
-        
+
         try:
-            # Read from ADC channel 1
-            raw_value = self._read_adc(1)
+            # Read digital value from D0 pin
+            digital_value = GPIO.input(LIGHT_SENSOR_PIN)
             
-            # Convert to lux (calibration depends on your sensor)
-            # This is a simple linear conversion - adjust based on your sensor
-            lux = (raw_value / 1023.0) * 2000
+            # Map digital value to approximate lux
+            # 0 (LOW) = bright → higher lux (e.g., 2000)
+            # 1 (HIGH) = dark → lower lux (e.g., 100)
+            if digital_value == LIGHT_DIGITAL_BRIGHT_VALUE:
+                lux = LIGHT_BRIGHT_LUX
+            else:
+                lux = LIGHT_DARK_LUX
             
-            return round(lux, 0)
+            if DEBUG_MODE:
+                print(f"Light sensor D0={digital_value} → {lux} lux")
             
+            return float(lux)
+
         except Exception as e:
             print(f"Error reading light level: {e}")
             return None
-    
+
     def read_all(self) -> Dict:
         """
-        Read all enabled sensors
+        Read all enabled sensors and return consolidated data
         
         Returns:
-            Dictionary with all sensor readings
+            Dictionary with all sensor readings and timestamp
         """
+        # Read temperature and humidity together (DHT22)
         temperature, humidity = self.read_temperature_humidity()
         
+        # Build reading dictionary
         reading = {
             'soil_pct': self.read_soil_moisture(),
             'temperature_c': temperature,
@@ -213,62 +198,107 @@ class SensorReader:
         self.last_reading = reading
         
         if DEBUG_MODE:
-            print(f"Sensor readings: {reading}")
+            print(f"📊 Sensor readings: {reading}")
         
         return reading
-    
+
     def is_reading_valid(self, reading: Dict) -> bool:
         """
-        Check if sensor reading is valid and safe
+        Validate sensor reading data
         
         Args:
-            reading: Sensor reading dictionary
+            reading: Dictionary with sensor data
             
         Returns:
-            True if reading is valid and safe
+            True if reading contains valid data
         """
         if not ENABLE_SAFETY_CHECKS:
             return True
         
-        # Check for None values
-        has_data = any(v is not None for k, v in reading.items() if k != 'timestamp')
+        # Check if at least one sensor has data
+        has_data = any(
+            v is not None 
+            for k, v in reading.items() 
+            if k != 'timestamp'
+        )
+        
         if not has_data:
-            print("Warning: No valid sensor data")
+            print("⚠ Warning: No valid sensor data in reading")
             return False
         
-        # Check temperature safety
+        # Safety check: temperature
         if reading.get('temperature_c') is not None:
             if reading['temperature_c'] > SAFETY_MAX_TEMP:
-                print(f"SAFETY: Temperature too high: {reading['temperature_c']}°C")
+                print(f"🚨 SAFETY: Temperature too high: {reading['temperature_c']}°C")
                 return False
         
-        # Check humidity safety
+        # Safety check: humidity
         if reading.get('humidity_pct') is not None:
             if reading['humidity_pct'] > SAFETY_MAX_HUMIDITY:
-                print(f"SAFETY: Humidity too high: {reading['humidity_pct']}%")
+                print(f"🚨 SAFETY: Humidity too high: {reading['humidity_pct']}%")
                 return False
         
         return True
-    
+
+    def get_last_reading(self) -> Optional[Dict]:
+        """
+        Get the last successful reading
+        
+        Returns:
+            Last reading dictionary or None
+        """
+        return self.last_reading
+
     def cleanup(self):
         """Cleanup GPIO resources"""
         if not self.use_mock and RPI_AVAILABLE:
             GPIO.cleanup()
-            print("GPIO cleanup completed")
+            print("✓ GPIO cleanup completed")
 
 
-# Test the sensor reader
+# ================================================================
+# Testing directly
+# ================================================================
 if __name__ == "__main__":
-    print("Testing sensor reader...")
-    sensor = SensorReader(use_mock=True)
+    print("=" * 60)
+    print("Testing Sensor Reader (Digital D0 Sensors)")
+    print("=" * 60)
+    print(f"DHT22 → GPIO {TEMPERATURE_HUMIDITY_PIN}")
+    print(f"Soil Moisture D0 → GPIO {SOIL_SENSOR_PIN}")
+    print(f"Light Sensor D0 → GPIO {LIGHT_SENSOR_PIN}")
+    print("=" * 60)
     
-    for i in range(5):
-        print(f"\nReading {i+1}:")
-        data = sensor.read_all()
-        for key, value in data.items():
-            if value is not None:
-                print(f"  {key}: {value}")
-        time.sleep(2)
+    sensor = SensorReader(use_mock=False)
+
+    try:
+        for i in range(5):
+            print(f"\n📊 Reading {i+1}/5:")
+            data = sensor.read_all()
+            
+            # Display readings
+            for key, value in data.items():
+                if key == 'timestamp':
+                    continue
+                if value is not None:
+                    unit = {
+                        'soil_pct': '%',
+                        'temperature_c': '°C',
+                        'humidity_pct': '%',
+                        'lux': ' lux'
+                    }.get(key, '')
+                    print(f"  {key:20s}: {value}{unit}")
+                else:
+                    print(f"  {key:20s}: N/A")
+            
+            # Validate
+            valid = sensor.is_reading_valid(data)
+            print(f"  Valid: {'✓ Yes' if valid else '✗ No'}")
+            
+            if i < 4:  # Don't sleep after last reading
+                time.sleep(3)
     
-    sensor.cleanup()
-    print("Test complete!")
+    except KeyboardInterrupt:
+        print("\n\nTest interrupted by user")
+    finally:
+        sensor.cleanup()
+        print("\n✓ Test complete!")

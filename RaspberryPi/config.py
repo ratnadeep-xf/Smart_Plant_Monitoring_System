@@ -1,6 +1,6 @@
 """
 Configuration file for Raspberry Pi Plant Monitoring System
-Copy this to config_local.py and update with your actual values
+Updated for direct GPIO digital sensors (no MCP3008)
 """
 
 import os
@@ -8,94 +8,84 @@ import os
 # ============================================
 # API Configuration
 # ============================================
-# Your backend server URL (no trailing slash)
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:3000/api")
-
-# Device authentication token (must match DEVICE_TOKEN_SECRET in backend .env)
-DEVICE_TOKEN = os.getenv("DEVICE_TOKEN", "your-device-token-secret-here")
-
-# Unique identifier for this Raspberry Pi device
+DEVICE_TOKEN = os.getenv("DEVICE_TOKEN", "/gYSguYys3l5YxurQV8GwTIYmjndII8DAXyzWXdcG/I=")
 DEVICE_ID = os.getenv("DEVICE_ID", "raspberry-pi-001")
 
 # ============================================
-# Sensor Configuration
+# Sensor Configuration (Digital D0 Pins)
 # ============================================
-# Enable/disable individual sensors
 ENABLE_SOIL_SENSOR = True
 ENABLE_TEMPERATURE_SENSOR = True
 ENABLE_HUMIDITY_SENSOR = True
 ENABLE_LIGHT_SENSOR = True
 
-# Sensor GPIO pins (BCM numbering)
-SOIL_SENSOR_PIN = 4          # Analog soil moisture sensor (requires ADC)
-TEMPERATURE_HUMIDITY_PIN = 17  # DHT22 or DHT11 sensor
-LIGHT_SENSOR_PIN = 27        # Analog light sensor (requires ADC)
+# GPIO Pin Configuration (BCM numbering)
+# DHT22 (temperature & humidity) → GPIO 4
+# Soil moisture sensor D0 (digital) → GPIO 27
+# LDR light sensor D0 (digital) → GPIO 17
+TEMPERATURE_HUMIDITY_PIN = 4
+SOIL_SENSOR_PIN = 27
+LIGHT_SENSOR_PIN = 17
 
-# ADC Configuration (if using MCP3008 for analog sensors)
-ADC_ENABLED = True
-ADC_CLK_PIN = 11
-ADC_DOUT_PIN = 9
-ADC_DIN_PIN = 10
-ADC_CS_PIN = 8
+# No ADC - Using digital sensors only
+ADC_ENABLED = False
 
-# Sensor calibration values
-SOIL_SENSOR_MIN = 0      # ADC value when completely dry
-SOIL_SENSOR_MAX = 1023   # ADC value when fully saturated
+# Digital sensor thresholds
+# For D0 pins: 0 = condition met (wet/bright), 1 = condition not met (dry/dark)
+SOIL_DIGITAL_WET_VALUE = 0   # D0 = 0 when soil is wet
+SOIL_DIGITAL_DRY_VALUE = 1   # D0 = 1 when soil is dry
+LIGHT_DIGITAL_BRIGHT_VALUE = 0  # D0 = 0 when bright
+LIGHT_DIGITAL_DARK_VALUE = 1    # D0 = 1 when dark
+
+# Mapping digital values to percentages/lux
+SOIL_WET_PERCENTAGE = 80   # When D0 = 0 (wet)
+SOIL_DRY_PERCENTAGE = 20   # When D0 = 1 (dry)
+LIGHT_BRIGHT_LUX = 2000    # When D0 = 0 (bright)
+LIGHT_DARK_LUX = 100       # When D0 = 1 (dark)
 
 # ============================================
 # Camera Configuration
 # ============================================
 ENABLE_CAMERA = True
-CAMERA_RESOLUTION = (1024, 768)  # (width, height)
-CAMERA_ROTATION = 0              # 0, 90, 180, or 270 degrees
-
-# Image quality (1-100, higher = better quality but larger file)
+CAMERA_RESOLUTION = (1024, 768)
+CAMERA_ROTATION = 0
 IMAGE_QUALITY = 85
 
 # ============================================
 # Water Pump Configuration
 # ============================================
-PUMP_GPIO_PIN = 18               # GPIO pin connected to relay for pump
-PUMP_ACTIVE_HIGH = True          # True if relay activates with HIGH signal
-PUMP_MAX_DURATION = 10           # Maximum seconds pump can run (safety)
-PUMP_MIN_INTERVAL = 300          # Minimum seconds between pump activations
+PUMP_GPIO_PIN = 18
+PUMP_ACTIVE_HIGH = True
+PUMP_MAX_DURATION = 10
+PUMP_MIN_INTERVAL = 300  # 5 minutes between activations
 
 # ============================================
-# Timing Configuration
+# Timing Configuration (in seconds)
 # ============================================
-# How often to read sensors and send telemetry (seconds)
-TELEMETRY_INTERVAL = 15
-
-# How often to capture and upload images (seconds)
-IMAGE_CAPTURE_INTERVAL = 300  # 5 minutes
-
-# How often to poll for commands (seconds)
-COMMAND_POLL_INTERVAL = 10
+TELEMETRY_INTERVAL = 15        # Send sensor data every 15 seconds
+IMAGE_CAPTURE_INTERVAL = 300   # Capture image every 5 minutes
+COMMAND_POLL_INTERVAL = 10     # Check for commands every 10 seconds
 
 # ============================================
 # Automatic Watering Configuration
 # ============================================
-# Enable local automatic watering based on thresholds
 ENABLE_AUTO_WATERING = True
-
-# Default thresholds (will be overridden by plant-specific thresholds from API)
-DEFAULT_SOIL_MIN = 30      # % - water when soil moisture below this
-DEFAULT_SOIL_MAX = 70      # % - stop watering when soil reaches this
-DEFAULT_TEMP_MIN = 15      # °C
-DEFAULT_TEMP_MAX = 30      # °C
-DEFAULT_HUMIDITY_MIN = 40  # %
-DEFAULT_HUMIDITY_MAX = 80  # %
-DEFAULT_LIGHT_MIN = 200    # lux
-DEFAULT_LIGHT_MAX = 2000   # lux
-
-# Auto-watering behavior
-AUTO_WATER_DURATION = 5    # Default watering duration (seconds)
-AUTO_WATER_CHECK_INTERVAL = 60  # How often to check if watering needed (seconds)
+DEFAULT_SOIL_MIN = 30          # Water when below 30%
+DEFAULT_SOIL_MAX = 70
+DEFAULT_TEMP_MIN = 15
+DEFAULT_TEMP_MAX = 30
+DEFAULT_HUMIDITY_MIN = 40
+DEFAULT_HUMIDITY_MAX = 80
+DEFAULT_LIGHT_MIN = 200
+DEFAULT_LIGHT_MAX = 2000
+AUTO_WATER_DURATION = 5        # Water for 5 seconds
+AUTO_WATER_CHECK_INTERVAL = 60 # Check soil every 60 seconds
 
 # ============================================
 # Logging Configuration
 # ============================================
-LOG_LEVEL = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_LEVEL = "INFO"
 LOG_FILE = "plant_monitor.log"
 LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 LOG_BACKUP_COUNT = 5
@@ -103,26 +93,20 @@ LOG_BACKUP_COUNT = 5
 # ============================================
 # Retry Configuration
 # ============================================
-API_REQUEST_TIMEOUT = 30    # Timeout for API requests (seconds)
-API_MAX_RETRIES = 3         # Number of retries for failed API calls
-API_RETRY_DELAY = 5         # Initial delay between retries (seconds)
+API_REQUEST_TIMEOUT = 30
+API_MAX_RETRIES = 3
+API_RETRY_DELAY = 5
 
 # ============================================
 # Safety Configuration
 # ============================================
-# Emergency stop if sensors give invalid readings
 ENABLE_SAFETY_CHECKS = True
-SAFETY_MAX_TEMP = 50        # °C - emergency stop if temp exceeds this
-SAFETY_MAX_HUMIDITY = 100   # % - emergency stop if humidity exceeds this
+SAFETY_MAX_TEMP = 50      # Maximum temperature in Celsius
+SAFETY_MAX_HUMIDITY = 100 # Maximum humidity percentage
 
 # ============================================
 # Development/Testing
 # ============================================
-# Use mock sensors for testing without hardware
-USE_MOCK_SENSORS = False
-
-# Use mock camera for testing without camera
-USE_MOCK_CAMERA = False
-
-# Verbose debug output
-DEBUG_MODE = False
+USE_MOCK_SENSORS = False   # Set to True for testing without hardware
+USE_MOCK_CAMERA = False    # Set to True for testing without camera
+DEBUG_MODE = True          # Enable detailed logging

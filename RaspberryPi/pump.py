@@ -19,14 +19,21 @@ from config import *
 class PumpController:
     """Handles water pump control with safety features"""
     
-    def __init__(self, use_mock: bool = not RPI_AVAILABLE):
+    def __init__(self, use_mock: bool = None):
         """
         Initialize pump controller
         
         Args:
             use_mock: Use mock pump instead of real GPIO (for testing)
+                     If None, will use ENABLE_PUMP config setting
         """
-        self.use_mock = use_mock
+        # Determine if we should use mock mode
+        if use_mock is None:
+            # Use mock if pump is disabled OR if RPi.GPIO is not available
+            self.use_mock = not ENABLE_PUMP or not RPI_AVAILABLE
+        else:
+            self.use_mock = use_mock
+            
         self.last_activation_time = 0
         self.total_activations = 0
         self.is_running = False
@@ -40,7 +47,13 @@ class PumpController:
             initial_state = GPIO.LOW if PUMP_ACTIVE_HIGH else GPIO.HIGH
             GPIO.output(PUMP_GPIO_PIN, initial_state)
         
-        print(f"PumpController initialized (mock={'ON' if self.use_mock else 'OFF'})")
+        mode = 'MOCK' if self.use_mock else 'REAL'
+        reason = ''
+        if self.use_mock and not ENABLE_PUMP:
+            reason = ' (ENABLE_PUMP=False)'
+        elif self.use_mock and not RPI_AVAILABLE:
+            reason = ' (RPi.GPIO not available)'
+        print(f"PumpController initialized: {mode}{reason}")
     
     def _set_pump_state(self, active: bool):
         """

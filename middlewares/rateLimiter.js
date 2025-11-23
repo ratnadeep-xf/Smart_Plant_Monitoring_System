@@ -186,6 +186,15 @@ function rateLimiterMiddleware(req, res, deviceId, durationSeconds) {
   return result;
 }
 
+// Named exports for ES6 imports
+export {
+  checkWaterRateLimit,
+  recordWaterEvent,
+  getWaterRateLimitStatus,
+  rateLimiterMiddleware,
+};
+
+// Default export for backward compatibility
 export default {
   checkWaterRateLimit,
   recordWaterEvent,

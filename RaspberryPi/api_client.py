@@ -16,7 +16,7 @@ from config import *
 class APIClient:
     """Handles all API communication with backend server"""
     
-    def __init__(self):
+    def _init_(self):
         """Initialize API client"""
         self.base_url = API_BASE_URL.rstrip('/')
         self.device_token = DEVICE_TOKEN
@@ -136,16 +136,12 @@ class APIClient:
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         }
         
-        # Remove Authorization header temporarily for multipart upload
-        # and add it to data instead (Next.js multipart handling)
-        headers = {'Authorization': f'Bearer {self.device_token}'}
-        
+        # Session already has Authorization header, so don't pass it again
         response = self._make_request(
             'POST',
             '/image',
             files=files,
-            data=data,
-            headers=headers
+            data=data
         )
         
         if response and response.status_code == 201:
@@ -155,7 +151,11 @@ class APIClient:
             return result.get('data')
         
         if response:
-            print(f"Image upload failed: {response.status_code} - {response.text}")
+            try:
+                error_data = response.json()
+                print(f"Image upload failed: {response.status_code} - {error_data}")
+            except:
+                print(f"Image upload failed: {response.status_code} - {response.text}")
         
         return None
     

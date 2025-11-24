@@ -9,16 +9,16 @@ import os
 # API Configuration
 # ============================================
 # Your backend server URL (no trailing slash)
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:3000/api")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://smart-plant-monitoring-system.vercel.app/api")
 
 # Device authentication token (must match DEVICE_TOKEN_SECRET in backend .env)
-DEVICE_TOKEN = os.getenv("DEVICE_TOKEN", "your-device-token-secret-here")
+DEVICE_TOKEN = os.getenv("DEVICE_TOKEN", "/gYSguYys3l5YxurQV8GwTIYmjndII8DAXyzWXdcG/I=")
 
 # Unique identifier for this Raspberry Pi device
 DEVICE_ID = os.getenv("DEVICE_ID", "raspberry-pi-001")
 
 # ============================================
-# Sensor Configuration
+# Sensor Configuration (Digital Sensors Only)
 # ============================================
 # Enable/disable individual sensors
 ENABLE_SOIL_SENSOR = True
@@ -26,21 +26,27 @@ ENABLE_TEMPERATURE_SENSOR = True
 ENABLE_HUMIDITY_SENSOR = True
 ENABLE_LIGHT_SENSOR = True
 
-# Sensor GPIO pins (BCM numbering)
-SOIL_SENSOR_PIN = 4          # Analog soil moisture sensor (requires ADC)
-TEMPERATURE_HUMIDITY_PIN = 17  # DHT22 or DHT11 sensor
-LIGHT_SENSOR_PIN = 27        # Analog light sensor (requires ADC)
+# Sensor GPIO pins (BCM numbering) - ALL DIGITAL
+SOIL_SENSOR_PIN = 4          # Digital soil moisture sensor D0 output
+TEMPERATURE_HUMIDITY_PIN = 17  # DHT22 or DHT11 sensor (digital)
+LIGHT_SENSOR_PIN = 27        # Digital light sensor D0 output
 
-# ADC Configuration (if using MCP3008 for analog sensors)
-ADC_ENABLED = True
-ADC_CLK_PIN = 11
-ADC_DOUT_PIN = 9
-ADC_DIN_PIN = 10
-ADC_CS_PIN = 8
+# ADC Configuration - DISABLED (not using MCP3008)
+ADC_ENABLED = False
 
-# Sensor calibration values
-SOIL_SENSOR_MIN = 0      # ADC value when completely dry
-SOIL_SENSOR_MAX = 1023   # ADC value when fully saturated
+# Digital sensor configuration
+# Note: Digital sensors output HIGH/LOW (1/0) not analog values
+# For soil moisture: LOW = wet, HIGH = dry (typical behavior)
+# For light sensor: LOW = bright, HIGH = dark (typical behavior)
+SOIL_DIGITAL_INVERTED = True   # True if LOW=wet, HIGH=dry
+LIGHT_DIGITAL_INVERTED = True  # True if LOW=bright, HIGH=dark
+
+# Since digital sensors only give binary output, we'll simulate percentage
+# based on the digital state for compatibility with the existing system
+DIGITAL_DRY_VALUE = 10         # % moisture when digital sensor reads "dry"
+DIGITAL_WET_VALUE = 90         # % moisture when digital sensor reads "wet"
+DIGITAL_DARK_VALUE = 50        # lux when light sensor reads "dark"
+DIGITAL_BRIGHT_VALUE = 1000    # lux when light sensor reads "bright"
 
 # ============================================
 # Camera Configuration

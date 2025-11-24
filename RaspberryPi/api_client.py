@@ -16,7 +16,7 @@ from config import *
 class APIClient:
     """Handles all API communication with backend server"""
     
-    def __init__(self):
+    def _init_(self):
         """Initialize API client"""
         try:
             self.base_url = API_BASE_URL.rstrip('/')

@@ -26,6 +26,7 @@ ENABLE_TEMPERATURE_SENSOR = True
 ENABLE_HUMIDITY_SENSOR = True
 ENABLE_LIGHT_SENSOR = True
 
+
 # Sensor GPIO pins (BCM numbering) - ALL DIGITAL
 SOIL_SENSOR_PIN = 4          # Digital soil moisture sensor D0 output
 TEMPERATURE_HUMIDITY_PIN = 17  # DHT22 or DHT11 sensor (digital)
@@ -47,6 +48,16 @@ DIGITAL_DRY_VALUE = 10         # % moisture when digital sensor reads "dry"
 DIGITAL_WET_VALUE = 90         # % moisture when digital sensor reads "wet"
 DIGITAL_DARK_VALUE = 50        # lux when light sensor reads "dark"
 DIGITAL_BRIGHT_VALUE = 1000    # lux when light sensor reads "bright"
+# Required for compatibility with sensors.py (even for digital sensors)
+SOIL_SENSOR_MIN = 0
+SOIL_SENSOR_MAX = 1023
+
+# Map digital config names to those expected by sensors.py
+LIGHT_DIGITAL_BRIGHT_VALUE = DIGITAL_BRIGHT_VALUE
+LIGHT_DIGITAL_DARK_VALUE = DIGITAL_DARK_VALUE
+SOIL_DIGITAL_WET_VALUE = DIGITAL_WET_VALUE
+SOIL_DIGITAL_DRY_VALUE = DIGITAL_DRY_VALUE
+
 
 # ============================================
 # Camera Configuration

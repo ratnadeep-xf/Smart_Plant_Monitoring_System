@@ -46,8 +46,14 @@ class SensorReader:
                 self.dht_device = None
             
             # Initialize ADC for analog sensors if enabled
+            self.adc_initialized = False
             if ADC_ENABLED:
                 self._init_adc()
+            else:
+                print("ADC disabled in config")
+        else:
+            self.adc_initialized = False
+            self.dht_device = None
         
         self.last_reading = None
         print(f"SensorReader initialized (mock={'ON' if self.use_mock else 'OFF'})")
@@ -55,18 +61,25 @@ class SensorReader:
     def _init_adc(self):
         """Initialize MCP3008 ADC for analog sensors"""
         try:
-            GPIO.setup(ADC_CLK_PIN, GPIO.OUT)
+            # Set up GPIO pins for MCP3008 SPI communication
+            GPIO.setup(ADC_CLK_PIN, GPIO.OUT, initial=GPIO.LOW)
             GPIO.setup(ADC_MISO_PIN, GPIO.IN)
-            GPIO.setup(ADC_MOSI_PIN, GPIO.OUT)
-            GPIO.setup(ADC_CS_PIN, GPIO.OUT)
-            print("MCP3008 ADC initialized successfully")
+            GPIO.setup(ADC_MOSI_PIN, GPIO.OUT, initial=GPIO.LOW)
+            GPIO.setup(ADC_CS_PIN, GPIO.OUT, initial=GPIO.HIGH)
+            self.adc_initialized = True
+            print("✓ MCP3008 ADC initialized successfully")
         except Exception as e:
-            print(f"Error initializing ADC: {e}")
+            print(f"✗ Error initializing ADC: {e}")
+            self.adc_initialized = False
     
     def _read_adc(self, channel: int) -> int:
         """Read from MCP3008 ADC channel"""
         if self.use_mock:
             return random.randint(0, 1023)
+        
+        if not self.adc_initialized:
+            print("ADC not initialized, using default value")
+            return 0
         
         try:
             GPIO.output(ADC_CS_PIN, GPIO.HIGH)

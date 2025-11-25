@@ -9,6 +9,18 @@ cloudinary.config({
 });
 
 export async function uploadFromBuffer(buffer, options = {}) {
+  // Validate buffer
+  if (!Buffer.isBuffer(buffer)) {
+    throw new Error('Invalid buffer provided to uploadFromBuffer');
+  }
+  
+  if (buffer.length === 0) {
+    throw new Error('Empty buffer provided to uploadFromBuffer');
+  }
+
+  console.log(`[Cloudinary] Uploading buffer: ${buffer.length} bytes`);
+  console.log(`[Cloudinary] Config check - cloud_name: ${cloudinary.config().cloud_name ? 'set' : 'MISSING'}, api_key: ${cloudinary.config().api_key ? 'set' : 'MISSING'}`);
+
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
       {
@@ -22,6 +34,7 @@ export async function uploadFromBuffer(buffer, options = {}) {
       (error, result) => {
         if (error) {
           console.error('Cloudinary upload error:', error);
+          console.error('Cloudinary error details:', JSON.stringify(error, null, 2));
           reject(error);
         } else if (!result) {
           reject(new Error('No result from Cloudinary'));

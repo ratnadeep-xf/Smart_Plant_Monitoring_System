@@ -50,12 +50,40 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
+    // Validate it's actually a file
+    if (typeof imageFile === 'string') {
+      return NextResponse.json({
+        error: 'Bad Request',
+        message: 'Image field contains string instead of file',
+      }, { status: 400 });
+    }
+
     // Convert file to buffer
     const bytes = await imageFile.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
+    // Validate buffer is not empty and is valid image data
+    if (buffer.length === 0) {
+      return NextResponse.json({
+        error: 'Bad Request',
+        message: 'Empty image buffer',
+      }, { status: 400 });
+    }
+
+    // Check if buffer starts with valid image magic bytes (JPEG or PNG)
+    const isJPEG = buffer[0] === 0xFF && buffer[1] === 0xD8;
+    const isPNG = buffer[0] === 0x89 && buffer[1] === 0x50;
+    
+    if (!isJPEG && !isPNG) {
+      console.error('Invalid image format. First bytes:', buffer.slice(0, 20).toString('hex'));
+      return NextResponse.json({
+        error: 'Bad Request',
+        message: 'Invalid image format. Expected JPEG or PNG.',
+      }, { status: 400 });
+    }
+
     // Upload to Cloudinary
-    console.log('Uploading image to Cloudinary...');
+    console.log(`Uploading image to Cloudinary... (${buffer.length} bytes, ${isJPEG ? 'JPEG' : 'PNG'})`);
     const cloudinaryResult = await uploadFromBuffer(buffer, {
       folder: 'smart-plant-care',
       tags: [deviceId, 'plant-detection'],

@@ -21,45 +21,43 @@ export async function uploadFromBuffer(buffer, options = {}) {
   console.log(`[Cloudinary] Uploading buffer: ${buffer.length} bytes`);
   console.log(`[Cloudinary] Config check - cloud_name: ${cloudinary.config().cloud_name ? 'set' : 'MISSING'}, api_key: ${cloudinary.config().api_key ? 'set' : 'MISSING'}`);
 
-  return new Promise((resolve, reject) => {
-    const uploadStream = cloudinary.uploader.upload_stream(
-      {
-        folder: options.folder || 'smart-plant-care',
-        public_id: options.public_id,
-        tags: options.tags || [],
-        context: options.context,
-        transformation: options.transformation,
-        resource_type: 'image',
+  try {
+    // Use data URI approach instead of streaming for better Vercel compatibility
+    const base64Image = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+    
+    const result = await cloudinary.uploader.upload(base64Image, {
+      folder: options.folder || 'smart-plant-care',
+      public_id: options.public_id,
+      tags: options.tags || [],
+      context: options.context,
+      transformation: options.transformation,
+      resource_type: 'image',
+    });
+
+    if (!result) {
+      throw new Error('No result from Cloudinary');
+    }
+
+    return {
+      publicId: result.public_id,
+      secureUrl: result.secure_url,
+      width: result.width,
+      height: result.height,
+      format: result.format,
+      bytes: result.bytes,
+      folder: result.folder,
+      metadata: {
+        created_at: result.created_at,
+        resource_type: result.resource_type,
+        type: result.type,
+        version: result.version,
       },
-      (error, result) => {
-        if (error) {
-          console.error('Cloudinary upload error:', error);
-          console.error('Cloudinary error details:', JSON.stringify(error, null, 2));
-          reject(error);
-        } else if (!result) {
-          reject(new Error('No result from Cloudinary'));
-        } else {
-          resolve({
-            publicId: result.public_id,
-            secureUrl: result.secure_url,
-            width: result.width,
-            height: result.height,
-            format: result.format,
-            bytes: result.bytes,
-            folder: result.folder,
-            metadata: {
-              created_at: result.created_at,
-              resource_type: result.resource_type,
-              type: result.type,
-              version: result.version,
-            },
-          });
-        }
-      }
-    );
-    const bufferStream = Readable.from(buffer);
-    bufferStream.pipe(uploadStream);
-  });
+    };
+  } catch (error) {
+    console.error('Cloudinary upload error:', error);
+    console.error('Cloudinary error details:', JSON.stringify(error, null, 2));
+    throw error;
+  }
 }
 
 export async function deleteImage(publicId) {

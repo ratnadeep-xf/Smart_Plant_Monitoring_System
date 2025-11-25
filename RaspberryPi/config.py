@@ -144,3 +144,14 @@ USE_MOCK_CAMERA = False
 
 # Verbose debug output
 DEBUG_MODE = False
+
+# ============================================
+# Local Configuration Override
+# ============================================
+# Try to import local configuration overrides
+# Create config_local.py to override any settings above
+try:
+    from config_local import *
+    print("✓ Loaded config_local.py overrides")
+except ImportError:
+    pass  # No local config file, use defaults above

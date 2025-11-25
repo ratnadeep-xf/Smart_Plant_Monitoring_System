@@ -37,9 +37,12 @@ class SensorReader:
 
             # Initialize DHT sensor
             try:
-                self.dht_device = adafruit_dht.DHT22(getattr(board, f"D{TEMPERATURE_HUMIDITY_PIN}"))
+                if DHT_SENSOR_TYPE == 22:
+                    self.dht_device = adafruit_dht.DHT22(getattr(board, f"D{DHT_PIN}"))
+                else:
+                    self.dht_device = adafruit_dht.DHT11(getattr(board, f"D{DHT_PIN}"))
             except Exception as e:
-                print("Error initializing DHT22 sensor:", e)
+                print("Error initializing DHT sensor:", e)
                 self.dht_device = None
             
             # Initialize ADC for analog sensors if enabled
@@ -53,10 +56,10 @@ class SensorReader:
         """Initialize MCP3008 ADC for analog sensors"""
         try:
             GPIO.setup(ADC_CLK_PIN, GPIO.OUT)
-            GPIO.setup(ADC_DOUT_PIN, GPIO.IN)
-            GPIO.setup(ADC_DIN_PIN, GPIO.OUT)
+            GPIO.setup(ADC_MISO_PIN, GPIO.IN)
+            GPIO.setup(ADC_MOSI_PIN, GPIO.OUT)
             GPIO.setup(ADC_CS_PIN, GPIO.OUT)
-            print("ADC initialized successfully")
+            print("MCP3008 ADC initialized successfully")
         except Exception as e:
             print(f"Error initializing ADC: {e}")
     
@@ -76,9 +79,9 @@ class SensorReader:
             
             for i in range(5):
                 if command & 0x80:
-                    GPIO.output(ADC_DIN_PIN, GPIO.HIGH)
+                    GPIO.output(ADC_MOSI_PIN, GPIO.HIGH)
                 else:
-                    GPIO.output(ADC_DIN_PIN, GPIO.LOW)
+                    GPIO.output(ADC_MOSI_PIN, GPIO.LOW)
                 command <<= 1
                 GPIO.output(ADC_CLK_PIN, GPIO.HIGH)
                 GPIO.output(ADC_CLK_PIN, GPIO.LOW)
@@ -88,7 +91,7 @@ class SensorReader:
                 GPIO.output(ADC_CLK_PIN, GPIO.HIGH)
                 GPIO.output(ADC_CLK_PIN, GPIO.LOW)
                 result <<= 1
-                if GPIO.input(ADC_DOUT_PIN):
+                if GPIO.input(ADC_MISO_PIN):
                     result |= 0x1
             
             GPIO.output(ADC_CS_PIN, GPIO.HIGH)
@@ -100,7 +103,7 @@ class SensorReader:
             return 0
     
     def read_soil_moisture(self) -> Optional[float]:
-        """Read soil moisture (ADC channel 0)"""
+        """Read soil moisture from MCP3008 CH1"""
         if not ENABLE_SOIL_SENSOR:
             return None
         
@@ -108,9 +111,9 @@ class SensorReader:
             return round(random.uniform(30, 70), 1)
         
         try:
-            raw_value = self._read_adc(0)
-            percentage = 100 - ((raw_value - SOIL_SENSOR_MIN) /
-                               (SOIL_SENSOR_MAX - SOIL_SENSOR_MIN) * 100)
+            raw_value = self._read_adc(SOIL_MOISTURE_CHANNEL)
+            # Convert to percentage (higher ADC = drier soil, so invert)
+            percentage = 100 - ((raw_value / 1023.0) * 100)
             percentage = max(0, min(100, percentage))
             return round(percentage, 1)
             
@@ -148,7 +151,7 @@ class SensorReader:
             return None, None
     
     def read_light_level(self) -> Optional[float]:
-        """Read LDR light level from ADC channel 1"""
+        """Read LDR light level from MCP3008 CH0"""
         if not ENABLE_LIGHT_SENSOR:
             return None
         
@@ -156,7 +159,8 @@ class SensorReader:
             return round(random.uniform(200, 1500), 0)
         
         try:
-            raw_value = self._read_adc(1)
+            raw_value = self._read_adc(LIGHT_SENSOR_CHANNEL)
+            # Convert ADC value to lux (higher ADC = brighter)
             lux = (raw_value / 1023.0) * 2000
             return round(lux, 0)
             

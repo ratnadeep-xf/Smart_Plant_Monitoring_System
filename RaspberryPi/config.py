@@ -18,7 +18,7 @@ DEVICE_TOKEN = os.getenv("DEVICE_TOKEN", "/gYSguYys3l5YxurQV8GwTIYmjndII8DAXyzWX
 DEVICE_ID = os.getenv("DEVICE_ID", "raspberry-pi-001")
 
 # ============================================
-# Sensor Configuration (Digital Sensors Only)
+# Sensor Configuration (Analog via MCP3008)
 # ============================================
 # Enable/disable individual sensors
 ENABLE_SOIL_SENSOR = True
@@ -26,37 +26,36 @@ ENABLE_TEMPERATURE_SENSOR = True
 ENABLE_HUMIDITY_SENSOR = True
 ENABLE_LIGHT_SENSOR = True
 
+# DHT22 Temperature/Humidity Sensor (Digital)
+DHT_PIN = 17                  # GPIO pin for DHT22 sensor
+DHT_SENSOR_TYPE = 22          # 22 for DHT22, 11 for DHT11
 
-# Sensor GPIO pins (BCM numbering) - ALL DIGITAL
-SOIL_SENSOR_PIN = 4          # Digital soil moisture sensor D0 output
-TEMPERATURE_HUMIDITY_PIN = 17  # DHT22 or DHT11 sensor (digital)
-LIGHT_SENSOR_PIN = 27        # Digital light sensor D0 output
+# ADC Configuration (MCP3008)
+ADC_ENABLED = True            # Enable MCP3008 ADC
+ADC_CLK_PIN = 11              # GPIO 11 (SCLK) - Pin 23
+ADC_MISO_PIN = 9              # GPIO 9 (MISO) - Pin 21
+ADC_MOSI_PIN = 10             # GPIO 10 (MOSI) - Pin 19
+ADC_CS_PIN = 8                # GPIO 8 (CE0) - Pin 24
 
-# ADC Configuration - DISABLED (not using MCP3008)
-ADC_ENABLED = False
+# Analog Sensor Channels on MCP3008
+LIGHT_SENSOR_CHANNEL = 0      # MCP3008 CH0 → LDR (Light Dependent Resistor)
+SOIL_MOISTURE_CHANNEL = 1     # MCP3008 CH1 → Soil Moisture Sensor
 
-# Digital sensor configuration
-# Note: Digital sensors output HIGH/LOW (1/0) not analog values
-# For soil moisture: LOW = wet, HIGH = dry (typical behavior)
-# For light sensor: LOW = bright, HIGH = dark (typical behavior)
-SOIL_DIGITAL_INVERTED = True   # True if LOW=wet, HIGH=dry
-LIGHT_DIGITAL_INVERTED = True  # True if LOW=bright, HIGH=dark
+# Sensor Calibration Values
+# These depend on your specific sensors and circuit
+SOIL_SENSOR_MIN = 0           # ADC value when completely dry
+SOIL_SENSOR_MAX = 1023        # ADC value when fully saturated
+SOIL_SENSOR_DRY_VALUE = 1023  # Raw ADC value for dry soil
+SOIL_SENSOR_WET_VALUE = 0     # Raw ADC value for wet soil
 
-# Since digital sensors only give binary output, we'll simulate percentage
-# based on the digital state for compatibility with the existing system
-DIGITAL_DRY_VALUE = 10         # % moisture when digital sensor reads "dry"
-DIGITAL_WET_VALUE = 90         # % moisture when digital sensor reads "wet"
-DIGITAL_DARK_VALUE = 50        # lux when light sensor reads "dark"
-DIGITAL_BRIGHT_VALUE = 1000    # lux when light sensor reads "bright"
-# Required for compatibility with sensors.py (even for digital sensors)
-SOIL_SENSOR_MIN = 0
-SOIL_SENSOR_MAX = 1023
+# LDR (Light) Calibration
+LIGHT_SENSOR_MIN = 0          # ADC value in darkness
+LIGHT_SENSOR_MAX = 1023       # ADC value in bright light
+LIGHT_SENSOR_DARK_VALUE = 0   # Raw ADC value for darkness
+LIGHT_SENSOR_BRIGHT_VALUE = 1023  # Raw ADC value for bright light
 
-# Map digital config names to those expected by sensors.py
-LIGHT_DIGITAL_BRIGHT_VALUE = DIGITAL_BRIGHT_VALUE
-LIGHT_DIGITAL_DARK_VALUE = DIGITAL_DARK_VALUE
-SOIL_DIGITAL_WET_VALUE = DIGITAL_WET_VALUE
-SOIL_DIGITAL_DRY_VALUE = DIGITAL_DRY_VALUE
+# For backward compatibility with sensors.py
+TEMPERATURE_HUMIDITY_PIN = DHT_PIN
 
 
 # ============================================

@@ -4,10 +4,69 @@ import prisma from '../../../lib/prisma.js';
 import { uploadFromBuffer } from '../../../services/cloudinaryService.js';
 import { inferByUrl } from '../../../services/huggingFaceService.js';
 import { lookupMapping } from '../../../services/labelMappingService.js';
+
+/**
+ * Process AI inference in background (non-blocking)
+ */
+async function processImageAI(imageId, imageUrl) {
+  try {
+    console.log(`[Background] Starting AI inference for image ${imageId}`);
+
+    // Check if already processed
+    const existingCache = await prisma.inferenceCache.findUnique({
+      where: { imageId },
+    });
+
+    if (existingCache) {
+      console.log(`[Background] Image ${imageId} already has inference cache, skipping`);
+      return;
+    }
+
+    // Call Hugging Face AI model
+    const aiResult = await inferByUrl(imageUrl);
+
+    // Store in cache
+    await prisma.inferenceCache.create({
+      data: {
+        imageId,
+        provider: aiResult.provider,
+        responseJson: aiResult.error 
+          ? { error: aiResult.error, detections: [] }
+          : aiResult.rawResponse,
+      },
+    });
+
+    console.log(`[Background] AI inference cached for image ${imageId}`);
+
+    // Create Detection records
+    if (aiResult.detections && aiResult.detections.length > 0) {
+      for (const det of aiResult.detections) {
+        const mapping = await lookupMapping(det.label, det.confidence);
+
+        await prisma.detection.create({
+          data: {
+            imageId,
+            label: det.label,
+            confidence: det.confidence,
+            plantTypeId: mapping.plantTypeId,
+            plantDataId: mapping.plantDataId,
+          },
+        });
+      }
+      console.log(`[Background] Created ${aiResult.detections.length} detection(s) for image ${imageId}`);
+    } else {
+      console.log(`[Background] No detections found for image ${imageId}`);
+    }
+  } catch (error) {
+    console.error(`[Background] AI processing error for image ${imageId}:`, error);
+    // Don't throw - let it fail silently in background
+  }
+}
+
 /**
  * POST /api/image
  * Accept image uploads from Raspberry Pi device
- * Uploads to Cloudinary, runs Hugging Face AI model detection, maps labels to plant types
+ * Uploads to Cloudinary, returns immediately, processes AI in background
  * 
  * Form data:
  * - device_id: string
@@ -110,86 +169,7 @@ export async function POST(request) {
 
     console.log(`Image uploaded: ${image.id}`);
 
-    // Check inference cache
-    let inferenceCache = await prisma.inferenceCache.findUnique({
-      where: { imageId: image.id },
-    });
-
-    let aiResult;
-    if (!inferenceCache) {
-      // Call Hugging Face AI model
-      console.log('Running Hugging Face AI inference...');
-      aiResult = await inferByUrl(cloudinaryResult.secureUrl);
-
-      // Store in cache
-      inferenceCache = await prisma.inferenceCache.create({
-        data: {
-          imageId: image.id,
-          provider: aiResult.provider,
-          responseJson: aiResult.error 
-            ? { error: aiResult.error, detections: [] }
-            : aiResult.rawResponse,
-        },
-      });
-    } else {
-      console.log('Using cached AI inference result');
-      aiResult = {
-        detections: [],
-        provider: inferenceCache.provider,
-        rawResponse: inferenceCache.responseJson,
-      };
-
-      // Parse detections from cached response
-      const cachedData = inferenceCache.responseJson;
-      
-      // Handle array response (most common)
-      if (Array.isArray(cachedData)) {
-        aiResult.detections = cachedData.map(item => ({
-          label: item.label || 'unknown',
-          confidence: item.score || item.confidence || 0,
-        }));
-      }
-      // Handle predictions array
-      else if (cachedData?.predictions) {
-        aiResult.detections = cachedData.predictions.map(p => ({
-          label: p.label || p.class || 'unknown',
-          confidence: p.score || p.confidence || 0,
-        }));
-      }
-    }
-
-    // Create Detection records
-    const detections = [];
-    let dominantDetection = null;
-    let maxConfidence = 0;
-
-    for (const det of aiResult.detections) {
-      // Map label to plant type/data
-      const mapping = await lookupMapping(det.label, det.confidence);
-
-      const detection = await prisma.detection.create({
-        data: {
-          imageId: image.id,
-          label: det.label,
-          confidence: det.confidence,
-          plantTypeId: mapping.plantTypeId,
-          plantDataId: mapping.plantDataId,
-        },
-        include: {
-          plantType: true,
-          plantData: true,
-        },
-      });
-
-      detections.push(detection);
-
-      if (det.confidence > maxConfidence) {
-        maxConfidence = det.confidence;
-        dominantDetection = detection;
-      }
-    }
-
-    // Prepare response
+    // Return immediately with image info - AI processing will happen asynchronously
     const response = {
       success: true,
       data: {
@@ -201,37 +181,16 @@ export async function POST(request) {
           height: cloudinaryResult.height,
           timestamp: image.timestamp,
         },
-        detections: detections.map(d => ({
-          id: d.id,
-          label: d.label,
-          confidence: d.confidence,
-          plantType: d.plantType ? {
-            id: d.plantType.id,
-            name: d.plantType.name,
-            thresholds: d.plantType.thresholds, // JSON object with all thresholds
-          } : null,
-          plantData: d.plantData ? {
-            id: d.plantData.id,
-            commonName: d.plantData.commonName,
-            wateringAmountMl: d.plantData.wateringAmountMl,
-            wateringFrequencyDays: d.plantData.wateringFrequencyDays,
-            idealSunlightExposure: d.plantData.idealSunlightExposure,
-            idealRoomTemperatureC: d.plantData.idealRoomTemperatureC,
-            idealHumidityPercent: d.plantData.idealHumidityPercent,
-            idealSoilMoisturePercent: d.plantData.idealSoilMoisturePercent,
-            idealSoilType: d.plantData.idealSoilType,
-            fertilizerType: d.plantData.fertilizerType,
-            idealFertilizerAmountMl: d.plantData.idealFertilizerAmountMl,
-          } : null,
-        })),
-        dominant: dominantDetection ? {
-          label: dominantDetection.label,
-          confidence: dominantDetection.confidence,
-          plantTypeId: dominantDetection.plantTypeId,
-          plantDataId: dominantDetection.plantDataId,
-        } : null,
+        detections: [], // Will be populated by background processing
+        dominant: null,
+        processing: true, // Indicates AI inference is in progress
       },
     };
+
+    // Trigger AI processing in background (don't await)
+    processImageAI(image.id, cloudinaryResult.secureUrl).catch(err => {
+      console.error(`Background AI processing failed for image ${image.id}:`, err);
+    });
 
     return NextResponse.json(response, { status: 201 });
   } catch (error) {

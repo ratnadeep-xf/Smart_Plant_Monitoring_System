@@ -117,12 +117,14 @@ class APIClient:
         
         return False
     
-    def upload_image(self, image_bytes: bytes) -> Optional[Dict]:
+    def upload_image(self, image_bytes: bytes, wait_for_ai: bool = True, max_wait: int = 60) -> Optional[Dict]:
         """
         Upload plant image to backend for AI analysis
         
         Args:
             image_bytes: Image data (JPEG format)
+            wait_for_ai: Whether to wait for AI processing to complete
+            max_wait: Maximum seconds to wait for AI processing
             
         Returns:
             Response data with detections and plant info, or None if failed
@@ -148,14 +150,61 @@ class APIClient:
             headers=headers
         )
         
-        if response and response.status_code == 201:
-            result = response.json()
-            if DEBUG_MODE:
-                print(f"Image uploaded successfully: {result}")
-            return result.get('data')
+        if not response or response.status_code != 201:
+            if response:
+                print(f"Image upload failed: {response.status_code} - {response.text}")
+            return None
         
-        if response:
-            print(f"Image upload failed: {response.status_code} - {response.text}")
+        result = response.json()
+        data = result.get('data')
+        
+        if DEBUG_MODE:
+            print(f"Image uploaded successfully: {result}")
+        
+        # If not waiting for AI or AI already processed, return immediately
+        if not wait_for_ai or not data.get('processing'):
+            return data
+        
+        # Poll for AI results
+        image_id = data.get('image', {}).get('id')
+        if not image_id:
+            print("No image ID in response, cannot poll for AI results")
+            return data
+        
+        print(f"AI processing in background, polling for results (max {max_wait}s)...")
+        start_time = time.time()
+        poll_interval = 5  # seconds between polls
+        
+        while time.time() - start_time < max_wait:
+            time.sleep(poll_interval)
+            
+            # Check AI status
+            ai_data = self.get_image_details(image_id)
+            if ai_data and not ai_data.get('processing'):
+                print(f"✓ AI processing complete ({len(ai_data.get('detections', []))} detection(s))")
+                return ai_data
+            
+            elapsed = int(time.time() - start_time)
+            print(f"  Still processing... ({elapsed}s elapsed)")
+        
+        print(f"⚠ AI processing timeout after {max_wait}s, returning partial data")
+        return data
+    
+    def get_image_details(self, image_id: int) -> Optional[Dict]:
+        """
+        Get image details including AI detection results
+        
+        Args:
+            image_id: Image ID
+            
+        Returns:
+            Image data with detections, or None if failed
+        """
+        response = self._make_request('GET', f'/image/{image_id}')
+        
+        if response and response.status_code == 200:
+            result = response.json()
+            return result.get('data')
         
         return None
     

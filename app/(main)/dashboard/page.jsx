@@ -225,8 +225,8 @@ export default function Dashboard() {
             title="Light Level" 
             value={Math.round(sensorData.light)} 
             min={0} 
-            max={100} 
-            unit="%" 
+            max={5000} 
+            unit=" lux" 
             color="yellow"
           />
         </div>

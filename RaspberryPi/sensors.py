@@ -100,7 +100,7 @@ class SensorReader:
             self.adc_initialized = False
     
     def _read_adc(self, channel: int) -> int:
-        """Read from MCP3008 ADC channel"""
+        """Read from MCP3008 ADC channel with proper timing"""
         if self.use_mock:
             return random.randint(0, 1023)
         
@@ -109,33 +109,52 @@ class SensorReader:
             return 0
         
         try:
+            # Ensure clean state before starting
+            time.sleep(0.001)  # 1ms settling time
+            
+            # Start communication - bring CS low
             GPIO.output(ADC_CS_PIN, GPIO.HIGH)
+            time.sleep(0.0001)  # 100μs
             GPIO.output(ADC_CLK_PIN, GPIO.LOW)
             GPIO.output(ADC_CS_PIN, GPIO.LOW)
             
+            # Send start bit, single-ended mode, and channel
             command = channel
-            command |= 0x18
+            command |= 0x18  # Start bit + single-ended
             command <<= 3
             
+            # Send command bits
             for i in range(5):
                 if command & 0x80:
                     GPIO.output(ADC_MOSI_PIN, GPIO.HIGH)
                 else:
                     GPIO.output(ADC_MOSI_PIN, GPIO.LOW)
                 command <<= 1
+                
+                # Clock pulse with delay
+                time.sleep(0.00001)  # 10μs
                 GPIO.output(ADC_CLK_PIN, GPIO.HIGH)
+                time.sleep(0.00001)  # 10μs
                 GPIO.output(ADC_CLK_PIN, GPIO.LOW)
             
+            # Read result bits (10-bit ADC = 10 bits, but we read 12 for alignment)
             result = 0
             for i in range(12):
+                time.sleep(0.00001)  # 10μs
                 GPIO.output(ADC_CLK_PIN, GPIO.HIGH)
+                time.sleep(0.00001)  # 10μs
                 GPIO.output(ADC_CLK_PIN, GPIO.LOW)
                 result <<= 1
                 if GPIO.input(ADC_MISO_PIN):
                     result |= 0x1
             
+            # End communication - bring CS high
             GPIO.output(ADC_CS_PIN, GPIO.HIGH)
+            
+            # Shift result and mask to 10 bits
             result >>= 1
+            result &= 0x3FF  # Mask to 10 bits (0-1023)
+            
             return result
             
         except Exception as e:

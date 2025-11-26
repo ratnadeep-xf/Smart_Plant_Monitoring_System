@@ -18,13 +18,25 @@ class APIClient:
     
     def __init__(self):
         """Initialize API client"""
-        self.base_url = API_BASE_URL.rstrip('/')
-        self.device_token = DEVICE_TOKEN
-        self.device_id = DEVICE_ID
+        try:
+            self.base_url = API_BASE_URL.rstrip('/')
+        except NameError:
+            raise RuntimeError("API_BASE_URL not found in config. Make sure config.py is imported correctly.")
+        
+        try:
+            self.device_token = DEVICE_TOKEN
+        except NameError:
+            raise RuntimeError("DEVICE_TOKEN not found in config. Make sure config.py is imported correctly.")
+        
+        try:
+            self.device_id = DEVICE_ID
+        except NameError:
+            raise RuntimeError("DEVICE_ID not found in config. Make sure config.py is imported correctly.")
+        
         self.session = requests.Session()
         self.session.headers.update({
             'Authorization': f'Bearer {self.device_token}',
-            'User-Agent': f'PlantMonitor-RaspberryPi/{DEVICE_ID}'
+            'User-Agent': f'PlantMonitor-RaspberryPi/{self.device_id}'
         })
         
         # Track API health
@@ -32,6 +44,7 @@ class APIClient:
         self.consecutive_failures = 0
         
         print(f"APIClient initialized: {self.base_url}")
+        print(f"Device ID: {self.device_id}")
     
     def _make_request(self, method: str, endpoint: str, **kwargs) -> Optional[requests.Response]:
         """
@@ -138,21 +151,21 @@ class APIClient:
             'timestamp': datetime.utcnow().isoformat() + 'Z'
         }
         
-        # Remove Authorization header temporarily for multipart upload
-        # and add it to data instead (Next.js multipart handling)
-        headers = {'Authorization': f'Bearer {self.device_token}'}
-        
+        # Session already has Authorization header, so don't pass it again
         response = self._make_request(
             'POST',
             '/image',
             files=files,
-            data=data,
-            headers=headers
+            data=data
         )
         
         if not response or response.status_code != 201:
             if response:
-                print(f"Image upload failed: {response.status_code} - {response.text}")
+                try:
+                    error_data = response.json()
+                    print(f"Image upload failed: {response.status_code} - {error_data}")
+                except:
+                    print(f"Image upload failed: {response.status_code} - {response.text}")
             return None
         
         result = response.json()

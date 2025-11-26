@@ -1,6 +1,6 @@
 """
 Camera module for Raspberry Pi Plant Monitoring System
-Handles capturing images from Pi Camera
+Handles capturing images from Pi Camera (using picamera2)
 """
 
 import io
@@ -9,11 +9,11 @@ from typing import Optional
 from PIL import Image
 
 try:
-    from picamera import PiCamera
-    PICAMERA_AVAILABLE = True
+    from picamera2 import Picamera2
+    PICAMERA2_AVAILABLE = True
 except ImportError:
-    PICAMERA_AVAILABLE = False
-    print("Warning: picamera not available. Using mock camera.")
+    PICAMERA2_AVAILABLE = False
+    print("Warning: picamera2 not available. Using mock camera.")
 
 from config import *
 
@@ -28,14 +28,22 @@ class CameraHandler:
         Args:
             use_mock: Use mock camera instead of real camera (for testing)
         """
-        self.use_mock = use_mock or not PICAMERA_AVAILABLE
+        self.use_mock = use_mock or not PICAMERA2_AVAILABLE
         self.camera = None
         
         if not self.use_mock and ENABLE_CAMERA:
             try:
-                self.camera = PiCamera()
-                self.camera.resolution = CAMERA_RESOLUTION
-                self.camera.rotation = CAMERA_ROTATION
+                self.camera = Picamera2()
+                
+                # Configure camera
+                config = self.camera.create_still_configuration(
+                    main={"size": CAMERA_RESOLUTION}
+                )
+                self.camera.configure(config)
+                
+                # Start camera
+                self.camera.start()
+                
                 # Allow camera to warm up
                 time.sleep(2)
                 print(f"Camera initialized: {CAMERA_RESOLUTION[0]}x{CAMERA_RESOLUTION[1]}")
@@ -60,11 +68,12 @@ class CameraHandler:
             return self._generate_mock_image()
         
         try:
-            # Capture to BytesIO stream
-            stream = io.BytesIO()
-            self.camera.capture(stream, format='jpeg', quality=IMAGE_QUALITY)
+            # Capture image as PIL Image
+            image = self.camera.capture_image("main")
             
-            # Get the bytes
+            # Convert to bytes
+            stream = io.BytesIO()
+            image.save(stream, format='JPEG', quality=IMAGE_QUALITY)
             stream.seek(0)
             image_bytes = stream.read()
             
@@ -132,6 +141,7 @@ class CameraHandler:
         """Cleanup camera resources"""
         if self.camera:
             try:
+                self.camera.stop()
                 self.camera.close()
                 print("Camera closed")
             except Exception as e:
@@ -141,7 +151,7 @@ class CameraHandler:
 # Test the camera handler
 if __name__ == "__main__":
     print("Testing camera handler...")
-    camera = CameraHandler(use_mock=True)
+    camera = CameraHandler(use_mock=False)  # Set to False to test real camera
     
     print("\nCapturing test images...")
     for i in range(3):

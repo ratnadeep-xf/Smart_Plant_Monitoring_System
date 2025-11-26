@@ -30,10 +30,24 @@ class SensorReader:
             use_mock: Use mock data instead of real sensors (for testing)
         """
         self.use_mock = use_mock or not RPI_AVAILABLE
+        self.gpio_initialized = False
         
         if not self.use_mock:
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setwarnings(False)
+            try:
+                # Clean up any previous GPIO state first
+                try:
+                    GPIO.cleanup()
+                except:
+                    pass
+                
+                GPIO.setmode(GPIO.BCM)
+                GPIO.setwarnings(False)  # Suppress GPIO warnings
+                self.gpio_initialized = True
+                print("✓ GPIO initialized")
+            except Exception as e:
+                print(f"✗ Error initializing GPIO: {e}")
+                self.use_mock = True
+                self.gpio_initialized = False
 
             # Initialize DHT sensor
             try:
@@ -60,16 +74,29 @@ class SensorReader:
     
     def _init_adc(self):
         """Initialize MCP3008 ADC for analog sensors"""
+        if not self.gpio_initialized:
+            print("✗ GPIO not initialized, cannot setup ADC")
+            self.adc_initialized = False
+            return
+            
         try:
-            # Set up GPIO pins for MCP3008 SPI communication
+            # Set up GPIO pins for MCP3008 SPI communication with initial states
             GPIO.setup(ADC_CLK_PIN, GPIO.OUT, initial=GPIO.LOW)
             GPIO.setup(ADC_MISO_PIN, GPIO.IN)
             GPIO.setup(ADC_MOSI_PIN, GPIO.OUT, initial=GPIO.LOW)
             GPIO.setup(ADC_CS_PIN, GPIO.OUT, initial=GPIO.HIGH)
+            
+            # Store pin references
+            self.adc_clk = ADC_CLK_PIN
+            self.adc_miso = ADC_MISO_PIN
+            self.adc_mosi = ADC_MOSI_PIN
+            self.adc_cs = ADC_CS_PIN
+            
             self.adc_initialized = True
             print("✓ MCP3008 ADC initialized successfully")
         except Exception as e:
             print(f"✗ Error initializing ADC: {e}")
+            print("  Hint: Another process may be using GPIO pins")
             self.adc_initialized = False
     
     def _read_adc(self, channel: int) -> int:
@@ -223,9 +250,15 @@ class SensorReader:
         return True
     
     def cleanup(self):
-        if not self.use_mock and RPI_AVAILABLE:
-            GPIO.cleanup()
-            print("GPIO cleanup completed")
+        """Cleanup GPIO resources"""
+        if not self.use_mock and RPI_AVAILABLE and self.gpio_initialized:
+            try:
+                GPIO.cleanup()
+                print("✓ GPIO cleanup completed")
+                self.gpio_initialized = False
+                self.adc_initialized = False
+            except Exception as e:
+                print(f"⚠ GPIO cleanup error: {e}")
 
 
 if __name__ == "__main__":

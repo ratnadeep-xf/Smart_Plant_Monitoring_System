@@ -379,7 +379,10 @@ class PlantMonitor:
 
 def signal_handler(sig, frame):
     """Handle Ctrl+C gracefully"""
-    print("\n\nReceived interrupt signal...")
+    print("\n\n⚠ Received interrupt signal...")
+    # Trigger cleanup through monitor instance if available
+    if 'monitor' in globals() and hasattr(monitor, 'shutdown'):
+        monitor.shutdown()
     sys.exit(0)
 
 
@@ -388,6 +391,12 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    # Create and run monitor
+    # Create and run monitor (make it global for signal handler)
     monitor = PlantMonitor()
-    monitor.run()
+    
+    try:
+        monitor.run()
+    except Exception as e:
+        print(f"\n🚨 Unexpected error: {e}")
+        monitor.shutdown()
+        raise

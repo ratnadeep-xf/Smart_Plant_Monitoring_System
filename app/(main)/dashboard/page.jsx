@@ -180,6 +180,64 @@ export default function Dashboard() {
     
     return () => clearInterval(interval);
   }, []);
+
+  // State for tracking shown notifications
+  const [shownNotifications, setShownNotifications] = useState(new Set());
+
+  // Poll for notifications every 10 seconds
+  useEffect(() => {
+    const checkNotifications = async () => {
+      try {
+        const response = await fetch('/api/notifications?deviceId=raspberry-pi-001');
+        const data = await response.json();
+
+        if (data.success && data.notifications) {
+          data.notifications.forEach((notification) => {
+            const notificationKey = notification.id;
+            
+            // Only show if not already shown
+            if (!shownNotifications.has(notificationKey)) {
+              // Show toast based on type
+              switch (notification.type) {
+                case 'success':
+                  toast.success(notification.title, {
+                    description: notification.message,
+                  });
+                  break;
+                case 'error':
+                  toast.error(notification.title, {
+                    description: notification.message,
+                  });
+                  break;
+                case 'warning':
+                  toast.warning(notification.title, {
+                    description: notification.message,
+                  });
+                  break;
+                case 'info':
+                  toast.info(notification.title, {
+                    description: notification.message,
+                  });
+                  break;
+              }
+
+              setShownNotifications(prev => new Set(prev).add(notificationKey));
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Failed to check notifications:', error);
+      }
+    };
+
+    // Initial check
+    checkNotifications();
+
+    // Poll every 10 seconds
+    const interval = setInterval(checkNotifications, 10000);
+
+    return () => clearInterval(interval);
+  }, [shownNotifications]);
   
   return (
     <main className="container mx-auto px-4 py-6">

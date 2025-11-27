@@ -71,7 +71,7 @@ IMAGE_QUALITY = 85
 # ============================================
 # Water Pump Configuration
 # ============================================
-ENABLE_PUMP = False              # Set to False when pump is not physically attached
+ENABLE_PUMP = True              # Set to False when pump is not physically attached
 PUMP_GPIO_PIN = 18               # GPIO pin connected to relay for pump
 PUMP_ACTIVE_HIGH = True          # True if relay activates with HIGH signal
 PUMP_MAX_DURATION = 10           # Maximum seconds pump can run (safety)
@@ -93,7 +93,7 @@ COMMAND_POLL_INTERVAL = 10
 # Automatic Watering Configuration
 # ============================================
 # Enable local automatic watering based on thresholds
-ENABLE_AUTO_WATERING = True
+ENABLE_AUTO_WATERING = False
 
 # Default thresholds (will be overridden by plant-specific thresholds from API)
 DEFAULT_SOIL_MIN = 30      # % - water when soil moisture below this

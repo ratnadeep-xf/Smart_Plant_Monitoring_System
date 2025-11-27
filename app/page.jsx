@@ -6,7 +6,7 @@ export default function Home() {
           Smart Adaptive Plant Care
         </h1>
         <p className="text-xl md:text-2xl mb-8 max-w-3xl">
-          Cloud-connected Raspberry Pi + YOLO detection + Next.js dashboard
+          Cloud-connected Raspberry Pi + AI detection + Next.js dashboard
         </p>
         <div className="flex flex-col sm:flex-row gap-4">
           <a

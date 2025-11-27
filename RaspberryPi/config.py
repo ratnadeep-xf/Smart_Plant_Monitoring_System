@@ -71,7 +71,7 @@ IMAGE_QUALITY = 85
 # ============================================
 # Water Pump Configuration
 # ============================================
-ENABLE_PUMP = True              # Set to False when pump is not physically attached
+ENABLE_PUMP = False              # Set to False when pump is not physically attached
 PUMP_GPIO_PIN = 18               # GPIO pin connected to relay for pump
 PUMP_ACTIVE_HIGH = True          # True if relay activates with HIGH signal
 PUMP_MAX_DURATION = 10           # Maximum seconds pump can run (safety)

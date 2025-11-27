@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import clientPromise from '@/lib/db';
 
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const deviceId = searchParams.get('deviceId') || 'raspberry-pi-001';
 
+    const client = await clientPromise;
+    const db = client.db();
+
     // Get latest telemetry reading
-    const latestReading = await prisma.telemetryReading.findFirst({
-      where: { device_id: deviceId },
-      orderBy: { timestamp: 'desc' },
-    });
+    const latestReading = await db.collection('telemetry_readings').findOne(
+      { device_id: deviceId },
+      { sort: { timestamp: -1 } }
+    );
 
     if (!latestReading) {
       return NextResponse.json({ notifications: [] });
@@ -78,15 +81,15 @@ export async function GET(request) {
     }
 
     // Check for recent watering commands (last 30 seconds)
-    const recentCommand = await prisma.command.findFirst({
-      where: {
+    const recentCommand = await db.collection('commands').findOne(
+      {
         device_id: deviceId,
         command_type: 'water',
         status: 'completed',
-        executed_at: { gte: new Date(Date.now() - 30000) },
+        executed_at: { $gte: new Date(Date.now() - 30000) },
       },
-      orderBy: { executed_at: 'desc' },
-    });
+      { sort: { executed_at: -1 } }
+    );
 
     if (recentCommand) {
       notifications.push({

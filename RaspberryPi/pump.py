@@ -66,10 +66,25 @@ class PumpController:
             print(f"[MOCK] Pump {'ON' if active else 'OFF'}")
             return
         
-        if PUMP_ACTIVE_HIGH:
-            GPIO.output(PUMP_GPIO_PIN, GPIO.HIGH if active else GPIO.LOW)
-        else:
-            GPIO.output(PUMP_GPIO_PIN, GPIO.LOW if active else GPIO.HIGH)
+        # Ensure GPIO is initialized before using it
+        try:
+            if PUMP_ACTIVE_HIGH:
+                GPIO.output(PUMP_GPIO_PIN, GPIO.HIGH if active else GPIO.LOW)
+            else:
+                GPIO.output(PUMP_GPIO_PIN, GPIO.LOW if active else GPIO.HIGH)
+        except RuntimeError as e:
+            if "pin numbering mode" in str(e):
+                # GPIO not initialized, reinitialize
+                GPIO.setmode(GPIO.BCM)
+                GPIO.setwarnings(False)
+                GPIO.setup(PUMP_GPIO_PIN, GPIO.OUT)
+                # Try again
+                if PUMP_ACTIVE_HIGH:
+                    GPIO.output(PUMP_GPIO_PIN, GPIO.HIGH if active else GPIO.LOW)
+                else:
+                    GPIO.output(PUMP_GPIO_PIN, GPIO.LOW if active else GPIO.HIGH)
+            else:
+                raise
     
     def can_activate(self) -> tuple[bool, Optional[str]]:
         """
@@ -158,7 +173,10 @@ class PumpController:
     def emergency_stop(self):
         """Emergency stop - immediately turn off pump"""
         print("EMERGENCY STOP: Shutting down pump")
-        self._set_pump_state(False)
+        try:
+            self._set_pump_state(False)
+        except Exception as e:
+            print(f"Warning during emergency stop: {e}")
         self.is_running = False
     
     def get_status(self) -> dict:
@@ -181,11 +199,17 @@ class PumpController:
     def cleanup(self):
         """Cleanup GPIO resources"""
         # Ensure pump is off
-        self._set_pump_state(False)
+        try:
+            self._set_pump_state(False)
+        except Exception as e:
+            print(f"Warning during cleanup: {e}")
         
         if not self.use_mock and RPI_AVAILABLE:
-            GPIO.cleanup(PUMP_GPIO_PIN)
-            print("Pump GPIO cleanup completed")
+            try:
+                GPIO.cleanup(PUMP_GPIO_PIN)
+                print("Pump GPIO cleanup completed")
+            except Exception as e:
+                print(f"Warning during GPIO cleanup: {e}")
 
 
 # Test the pump controller

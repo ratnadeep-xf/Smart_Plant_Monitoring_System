@@ -34,13 +34,14 @@ class SensorReader:
         
         if not self.use_mock:
             try:
-                # Clean up any previous GPIO state first
+                # Initialize GPIO mode if not already set
+                # Don't call cleanup() here as it would reset other modules (like pump)
                 try:
-                    GPIO.cleanup()
-                except:
+                    GPIO.setmode(GPIO.BCM)
+                except ValueError:
+                    # GPIO mode already set, that's fine
                     pass
                 
-                GPIO.setmode(GPIO.BCM)
                 GPIO.setwarnings(False)  # Suppress GPIO warnings
                 self.gpio_initialized = True
                 print("✓ GPIO initialized")
@@ -272,8 +273,13 @@ class SensorReader:
         """Cleanup GPIO resources"""
         if not self.use_mock and RPI_AVAILABLE and self.gpio_initialized:
             try:
-                GPIO.cleanup()
-                print("✓ GPIO cleanup completed")
+                # Only cleanup sensor-specific pins, not all GPIO
+                # This prevents interfering with pump or other modules
+                if self.adc_initialized:
+                    GPIO.cleanup([ADC_CLK_PIN, ADC_MISO_PIN, ADC_MOSI_PIN, ADC_CS_PIN])
+                if self.dht_initialized:
+                    GPIO.cleanup(DHT_PIN)
+                print("✓ Sensor GPIO cleanup completed")
                 self.gpio_initialized = False
                 self.adc_initialized = False
             except Exception as e:
